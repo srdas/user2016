@@ -1,0 +1,2184 @@
+---
+title: "Text Mining - moRe than woRds"
+author: "Sanjiv Ranjan Das and Karthik Mokashi"
+date: "UseR @Stanford -- June 2016"
+output: slidy_presentation
+---
+
+
+## Reference monograph
+
+Text expands the universe of data by many-fold. See my monograph on text mining in finance at:
+http://algo.scu.edu/~sanjivdas/Das_TextAnalyticsInFinance.pdf
+
+This covers some of the content of this presentation. These files are useful for the talk itself and you may run the program code as we proceed. 
+
+http://algo.scu.edu/~sanjivdas/Temp/user2016/
+
+
+
+
+
+## Text as Data
+
+1. Big Text: there is more textual data than numerical data. 
+2. Text is versatile. Nuances and behavioral expressions that are not conveyed with numbers. 
+3. Text contains emotive content. Sentiment analysis. Admati-Pfleiderer 2001; DeMarzo et al 2003; Antweiler-Frank 2004, 2005; Das-Chen 2007; Tetlock 2007; Tetlock et al 2008; Mitra et al 2008; Leinweber-Sisk 2010. 
+4. Text contains opinions and connections. Das et al 2005; Das and Sisk 2005; Godes et al 2005; Li 2006; Hochberg et al 2007.
+5. Numbers aggregate; text disaggregates.
+
+## Anecdotal ...
+
+1. In a talk at the 17th ACM Conference on Information Knowledge and Management (CIKM '08), Google's director of research Peter Norvig stated his unequivocal preference for data over algorithms---"data is more agile than code." Yet, it is well-understood that too much data can lead to overfitting so that an algorithm becomes mostly useless out-of-sample. 
+2. Chris Anderson: "Data is the New Theory."
+3. These issues are relevant to text mining, but let's put them on hold till the end of the session. 
+
+## Definition: Text-Mining
+
+1. Text mining is the large-scale, automated processing of plain text language in digital form to extract data that is converted into useful quantitative or qualitative information. 
+2. Text mining is automated on big data that is not amenable to human processing within reasonable time frames. It entails extracting data that is converted into information of many types. 
+3. Simple: Text mining may be simple as in key word searches and counts. 
+4. Complicated: It may require language parsing and complex rules for information extraction. 
+5. Structured text, such as the information in forms and some kinds of web pages. 
+6. Unstructured text is a much harder endeavor. 
+7. Text mining is also aimed at unearthing unseen relationships in unstructured text as in meta analyses of research papers, see Van Noorden 2012.
+
+## Definition: News Analytics
+
+Wikipedia defines it as - "...  the measurement of the various qualitative and quantitative attributes of textual (unstructured data) news stories. Some of these attributes are: sentiment, relevance, and novelty. Expressing news stories as numbers permits the manipulation of everyday information in a mathematical and statistical way. News analytics are used in financial modeling, particularly in quantitative and algorithmic trading. Further, news analytics can be used to plot and characterize firm behaviors over time and thus yield important strategic insights about rival firms. News analytics are usually derived through automated text analysis and applied to digital texts using elements from natural language processing and machine learning such as latent semantic analysis, support vector machines, `bag of words', among other techniques."
+
+https://www.amazon.com/Handbook-News-Analytics-Finance/dp/047066679X/ref=sr_1_1?ie=UTF8&qid=1466897817&sr=8-1&keywords=handbook+of+news+analytics
+
+
+## Data and Algorithms
+
+<img src = "data_algo.jpg" width=700 height=450>
+
+## Text Extraction
+
+The R programming language is increasingly being used to download text from the web and then analyze it. The ease with which R may be used to scrape text from web site may be seen from the following simple command in R:
+
+```{r}
+text = readLines("http://algo.scu.edu/~sanjivdas/bio-candid.html")
+text[15:20]
+```
+
+Here, we downloaded the my bio page from my university's web site. It's a simple HTML file. 
+
+```{r}
+length(text)
+```
+
+## String Parsing
+
+Suppose we just want the 17th line, we do:
+
+```{r}
+text[17]
+```
+
+And, to find out the character length of the this line we use the function:
+
+```{r}
+library(stringr)
+str_length(text[17])
+```
+
+We have first invoked the library **stringr** that contains many string handling functions. In fact, we may also get the length of each line in the text vector by applying the function **length()** to the entire text vector.
+
+```{r}
+text_len = str_length(text)
+print(text_len)
+print(text_len[55])
+text_len[17]
+```
+
+## Sort by Length
+
+Some lines are very long and are the ones we are mainly interested in as they contain the bulk of the story, whereas many of the remaining lines that are shorter contain html formatting instructions. Thus, we may extract the top three lengthy lines with the following set of commands.
+
+```{r}
+res = sort(text_len,decreasing=TRUE,index.return=TRUE)
+idx = res$ix
+text2 = text[idx]
+text2
+```
+
+## Text cleanup
+
+In short, text extraction can be exceedingly simple, though getting clean text is not as easy an operation. Removing html tags and other unnecessary elements in the file is also a fairly simple operation. We undertake the following steps that use generalized regular expressions (i.e., **grep**) to eliminate html formatting characters. 
+
+This will generate one single paragraph of text, relatively clean of formatting characters. Such a text collection is also known as a "bag of words".
+
+```{r}
+text = paste(text,collapse="\n")
+print(text)
+text = str_replace_all(text,"[<>{}()&;,.\n]"," ")
+print(text)
+```
+
+## XML Package
+
+The **XML** package in R also comes with many functions that aid in cleaning up text and dropping it (mostly unformatted) into a flat file or data frame. This may then be further processed. Here is some example code for this.
+
+## Processing XML files in R into a data frame
+
+The following example has been adapted from r-bloggers.com. It uses the following URL:
+
+http://www.w3schools.com/xml/plant_catalog.xml
+
+```{r}
+library(XML)
+#Part1: Reading an xml and creating a data frame with it.
+
+xml.url <- "http://www.w3schools.com/xml/plant_catalog.xml"
+xmlfile <- xmlTreeParse(xml.url)
+xmltop <- xmlRoot(xmlfile)
+plantcat <- xmlSApply(xmltop, function(x) xmlSApply(x, xmlValue))
+plantcat_df <- data.frame(t(plantcat),row.names=NULL)
+plantcat_df[1:5,1:4]
+```
+
+## Creating a XML file from a data frame
+
+```{r}
+#Example adapted from https://stat.ethz.ch/pipermail/r-help/2008-September/175364.html
+#Load the iris data set and create a data frame
+data("iris")
+data <- as.data.frame(iris)
+
+xml <- xmlTree()
+xml$addTag("document", close=FALSE)
+for (i in 1:nrow(data)) {
+  xml$addTag("row", close=FALSE)
+  for (j in names(data)) {
+    xml$addTag(j, data[i, j])
+  }
+  xml$closeTag()
+}
+xml$closeTag()
+
+#view the xml
+cat(saveXML(xml))
+```
+
+## The Response to News
+
+### Das, Martinez-Jerez, and Tufano (FM 2005)
+
+<img src = "news_posters1.png" width=600 height=350>
+
+### Breakdown of News Flow
+
+<img src = "news_posters2.png" width=600 height=350>
+
+### Frequency of Postings
+
+<img src = "posters_histogram.png" width=600 height=350>
+
+### Weekly Posting
+
+<img src = "weekly_postings.png" width=600 height=350>
+
+### Intraday Posting
+
+<img src = "intraday_postings.png" width=600 height=350>
+
+### Number of Characters per Posting
+
+<img src = "characters_postings.png" width=600 height=350>
+
+## Text Handling
+
+First, let's read in a simple web page (my landing page)
+
+```{r}
+text = readLines("http://algo.scu.edu/~sanjivdas/")
+print(text[1:4])
+print(length(text))
+```
+
+## String Detection
+
+String handling is a basic need, so we use the **stringr** package.
+
+```{r}
+#EXTRACTING SUBSTRINGS (take some time to look at
+#the "stringr" package also)
+library(stringr)
+substr(text[4],24,29)
+
+#IF YOU WANT TO LOCATE A STRING
+res = regexpr("Sanjiv",text[4])
+print(res)
+
+print(substr(text[4],res[1],res[1]+nchar("Sanjiv")-1))
+
+#ANOTHER WAY
+res = str_locate(text[4],"Sanjiv")
+print(res)
+
+print(substr(text[4],res[1],res[2]))
+```
+
+## Cleaning Text
+
+Now we look at using regular expressions with the **grep** command to clean out text. I will read in my research page to process this. Here we are undertaking a "ruthless" cleanup.
+
+```{r}
+#SIMPLE TEXT HANDLING
+text = readLines("http://algo.scu.edu/~sanjivdas/research.htm")
+print(length(text))
+print(text)
+
+text = text[setdiff(seq(1,length(text)),grep("<",text))]
+text = text[setdiff(seq(1,length(text)),grep(">",text))]
+text = text[setdiff(seq(1,length(text)),grep("]",text))]
+text = text[setdiff(seq(1,length(text)),grep("}",text))]
+text = text[setdiff(seq(1,length(text)),grep("_",text))]
+text = text[setdiff(seq(1,length(text)),grep("\\/",text))]
+print(length(text))
+print(text)
+
+text = str_replace_all(text,"[\"]","")
+idx = which(nchar(text)==0)
+research = text[setdiff(seq(1,length(text)),idx)]
+print(research)
+```
+
+Take a look at the text now to see how cleaned up it is. But there is a better way, i.e., use the text-mining package **tm**.
+
+## Text Mining with the "tm" Package
+
+1. The R programming language supports a text-mining package, succinctly named {\tt tm}. Using functions such as {\tt readDOC()}, {\tt readPDF()}, etc., for reading DOC and PDF files, the package makes accessing various file formats easy. 
+
+2. Text mining involves applying functions to many text documents. A library of text documents (irrespective of format) is called a **corpus**. The essential and highly useful feature of text mining packages is the ability to operate on the entire set of documents at one go. 
+
+```{r}
+library(tm)
+text = c("INTL is expected to announce good earnings report", "AAPL first quarter disappoints","GOOG announces new wallet", "YHOO ascends from old ways")
+text_corpus = Corpus(VectorSource(text))
+print(text_corpus)
+writeCorpus(text_corpus)
+```
+
+The **writeCorpus()** function in **tm** creates separate text files on the hard drive, and by default are names **1.txt**, **2.txt**, etc. The simple program code above shows how text scraped off a web page and collapsed into a single character string for each document, may then be converted into a corpus of documents using the **Corpus()** function.
+
+It is easy to inspect the corpus as follows:
+
+```{r}
+inspect(text_corpus)
+```
+
+## A second example
+
+Here we use **lapply** to inspect the contents of the corpus. 
+
+```{r}
+#USING THE tm PACKAGE
+library(tm)
+text = c("Doc1;","This is doc2 --", "And, then Doc3.")
+ctext = Corpus(VectorSource(text))
+ctext
+#writeCorpus(ctext)
+
+#THE CORPUS IS A LIST OBJECT in R of type VCorpus or Corpus
+inspect(ctext)
+
+print(as.character(ctext[[1]]))
+
+print(lapply(ctext[1:2],as.character))
+
+ctext = tm_map(ctext,tolower)  #Lower case all text in all docs
+inspect(ctext)
+
+ctext2 = tm_map(ctext,toupper)
+inspect(ctext2)
+```
+
+## Function *tm_map*
+
+- The **tm_map** function is very useful for cleaning up the documents. We may want to remove some words.
+- We may also remove *stopwords*, punctuation, numbers, etc.
+
+```{r}
+#FIRST CURATE TO UPPER CASE
+dropWords = c("IS","AND","THEN")
+ctext2 = tm_map(ctext2,removeWords,dropWords)
+inspect(ctext2)
+```
+
+```{r}
+ctext = Corpus(VectorSource(text))
+temp = ctext
+print(lapply(temp,as.character))
+temp = tm_map(temp,removeWords,stopwords("english"))
+print(lapply(temp,as.character))
+temp = tm_map(temp,removePunctuation)
+print(lapply(temp,as.character))
+temp = tm_map(temp,removeNumbers)
+print(lapply(temp,as.character))
+```
+
+## Bag of Words
+
+We can create a *bag of words* by collapsing all the text into one bundle.
+
+```{r}
+#CONVERT CORPUS INTO ARRAY OF STRINGS AND FLATTEN
+txt = NULL
+for (j in 1:length(temp)) {
+  txt = c(txt,temp[[j]]$content)
+}
+txt = paste(txt,collapse=" ")
+txt = tolower(txt)
+print(txt)
+```
+
+## Example (on my bio page)
+
+Now we will do a full pass through of this on my bio.
+
+```{r}
+text = readLines("http://algo.scu.edu/~sanjivdas/bio-candid.html")
+ctext = Corpus(VectorSource(text))
+ctext
+
+print(lapply(ctext, as.character))
+
+ctext = tm_map(ctext,removePunctuation)
+print(lapply(ctext, as.character))
+
+txt = NULL
+for (j in 1:length(ctext)) {
+  txt = c(txt,ctext[[j]]$content)
+}
+txt = paste(txt,collapse=" ")
+txt = tolower(txt)
+print(txt)
+```
+
+## Term Document Matrix (TDM)
+
+An extremeley important object in text analysis is the **Term-Document Matrix**. This allows us to store an entire library of text inside a single matrix. This may then be used for analysis as well as searching documents. It forms the basis of search engines, topic analysis, and classification (spam filtering).
+
+It is a table that provides the frequency count of every word (term) in each document. The number of rows in the TDM is equal to the number of unique terms, and the number of columns is equal to the number of documents. 
+
+```{r}
+#TERM-DOCUMENT MATRIX
+tdm = TermDocumentMatrix(ctext,control=list(minWordLength=1))
+print(tdm)
+
+inspect(tdm[10:20,11:18])
+
+out = findFreqTerms(tdm,lowfreq=5)
+print(out)
+```
+
+## Term Frequency - Inverse Document Frequency (TF-IDF)
+
+This is a weighting scheme provided to sharpen the importance of rare words in a document, relative to the frequency of these words in the corpus. It is based on simple calculations and even though it does not have strong theoretical foundations, it is still very useful in practice. The TF-IDF is the importance of a word $w$ in a document $d$ in a corpus $C$. Therefore it is a function of all these three, i.e., we write it as TF-IDF$(w,d,C)$, and is the product of term frequency (TF) and inverse document frequency (IDF). 
+
+The frequency of a word in a document is defined as 
+$$
+f(w,d) = \frac{\#w \in d}{|d|}
+$$
+where $|d|$ is the number of words in the document. We usually normalize word frequency so that 
+$$
+TF(w,d) = \ln[f(w,d)]
+$$
+This is log normalization. Another form of normalization is known as double normalization and is as follows:
+$$
+TF(w,d) = \frac{1}{2} + \frac{1}{2} \frac{f(w,d)}{\max_{w \in d} f(w,d)}
+$$
+Note that normalization is not necessary, but it tends to help shrink the difference between counts of words. 
+
+Inverse document frequency is as follows:
+$$
+IDF(w,C) = \ln\left[ \frac{|C|}{|d_{w \in d}|} \right]
+$$
+That is, we compute the ratio of the number of documents in the corpus $C$ divided by the number of documents with word $w$ in the corpus. 
+
+Finally, we have the weighting score for a given word $w$ in document $d$ in corpus $C$:
+$$
+\mbox{TF-IDF}(w,d,C) = TF(w,d) \times IDF(w,C)
+$$
+
+## Example of TD-IDF 
+
+We illustrate this with an application to the previously computed term-document matrix. 
+
+```{r}
+tdm_mat = as.matrix(tdm)  #Convert tdm into a matrix
+print(dim(tdm_mat))
+nw = dim(tdm_mat)[1]
+nd = dim(tdm_mat)[2]
+doc = 13   #Choose document
+word = "derivatives"   #Choose word
+
+#COMPUTE TF
+f = NULL
+for (w in row.names(tdm_mat)) {
+    f = c(f,tdm_mat[w,doc]/sum(tdm_mat[,doc]))
+}
+fw = tdm_mat[word,doc]/sum(tdm_mat[,doc])
+TF = 0.5 + 0.5*fw/max(f)
+print(TF)
+
+#COMPUTE IDF
+nw = length(which(tdm_mat[word,]>0))
+print(nw)
+IDF = nd/nw
+print(IDF)
+
+#COMPUTE TF-IDF
+TF_IDF = TF*IDF
+print(TF_IDF)  #With normalization
+print(fw*IDF)   #Without normalization
+```
+
+We can write this code into a function and work out the TF-IDF for all words. Then these word weights may be used in further text analysis. 
+
+## TF-IDF in the **tm** package
+
+We may also directly use the **weightTfIdf** function in the **tm** package. This undertakes the following computation: 
+
+- Term frequency ${\it tf}_{i,j}$ counts the number of occurrences $n_{i,j}$ of a term $t_i$ in a document $d_j$. In the case of normalization, the term frequency $\mathit{tf}_{i,j}$ is divided by $\sum_k n_{k,j}$.
+
+- Inverse document frequency for a term $t_i$ is defined as $\mathit{idf}_i = \log_2 \frac{|D|}{|{d_{t_i \in d}}|}$ where $|D|$ denotes the total number of documents $|{d_{t_i \in d}}|$ is the number of documents where the term $t_i$ appears.
+
+- Term frequency - inverse document frequency is now defined as $\mathit{tf}_{i,j} \cdot \mathit{idf}_i$.
+
+*Example*:
+
+```{r}
+library(tm)
+textarray = c("Free software comes with ABSOLUTELY NO certain WARRANTY","You are welcome to redistribute free software under certain conditions","Natural language support for software in an English locale","A collaborative project with many contributors")
+textcorpus = Corpus(VectorSource(textarray))
+m = TermDocumentMatrix(textcorpus)
+print(as.matrix(m))
+print(as.matrix(weightTfIdf(m)))
+```
+
+
+
+## Wordclouds
+
+Wordlcouds are interesting ways in which to represent text. They give an instant visual summary. The **wordcloud** package in R may be used to create your own wordclouds.
+
+```{r}
+#MAKE A WORDCLOUD
+library(wordcloud)
+tdm2 = as.matrix(tdm)
+wordcount = sort(rowSums(tdm2),decreasing=TRUE)
+tdm_names = names(wordcount)
+wordcloud(tdm_names,wordcount)
+
+#REMOVE STOPWORDS, NUMBERS, STEMMING
+ctext1 = tm_map(ctext,removeWords,stopwords("english"))
+ctext1 = tm_map(ctext1, removeNumbers)
+tdm = TermDocumentMatrix(ctext1,control=list(minWordLength=1))
+tdm2 = as.matrix(tdm)
+wordcount = sort(rowSums(tdm2),decreasing=TRUE)
+tdm_names = names(wordcount)
+wordcloud(tdm_names,wordcount)
+```
+
+## Stemming
+
+**Stemming** is the procedure by which a word is reduced to its root or stem. This is done so as to treat words from the one stem as the same word, rather than as separate words. We do not want "eaten" and "eating" to be treated as different words for example.
+
+```{r}
+#STEMMING
+ctext2 = tm_map(ctext,removeWords,stopwords("english"))
+ctext2 = tm_map(ctext2, stemDocument)
+print(lapply(ctext2, as.character))
+```
+
+## Regular Expressions
+
+Regular expressions are syntax used to modify strings in an efficient manner. They are complicated but extremely effective. Here we will illustrate with a few examples, but you are encouraged to explore more on your own, as the variations are endless. What you need to do will depend on the application at hand, and with some experience you will become better at using regular expressions. The initial use will however be somewhat confusing. 
+
+We start with a simple example of a text array where we wish replace the string "data" with a blank, i.e., we eliminate this string from the text we have.  
+
+```{r}
+library(tm)
+#Create a text array
+text = c("Doc1 is datavision","Doc2 is datatable","Doc3 is data","Doc4 is nodata","Doc5 is simpler")
+print(text)
+
+#Remove all strings with the chosen text for all docs
+print(gsub("data","",text))
+
+#Remove all words that contain "data" at the start even if they are longer than data
+print(gsub("*data.*","",text))
+
+#Remove all words that contain "data" at the end even if they are longer than data
+print(gsub("*.data*","",text))
+
+#Remove all words that contain "data" at the end even if they are longer than data
+print(gsub("*.data.*","",text))
+```
+
+## Complex Regular Expressions using *grep*
+
+We now explore some more complex regular expressions. One case that is common is handling the search for special types of strings like telephone numbers. Suppose we have a text array that may contain telephone numbers in different formats, we can use a single **grep** command to extract these numbers. Here is some code to illustrate this. 
+
+```{r}
+#Create an array with some strings which may also contain telephone numbers as strings. 
+x = c("234-5678","234 5678","2345678","1234567890","0123456789","abc 234-5678","234 5678 def","xx 2345678","abc1234567890def")
+
+#Now use grep to find which elements of the array contain telephone numbers
+idx = grep("[[:digit:]]{3}-[[:digit:]]{4}|[[:digit:]]{3} [[:digit:]]{4}|[1-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]",x)
+print(idx)
+print(x[idx])
+
+#We can shorten this as follows
+idx = grep("[[:digit:]]{3}-[[:digit:]]{4}|[[:digit:]]{3} [[:digit:]]{4}|[1-9][0-9]{9}",x)
+print(idx)
+print(x[idx])
+
+#What if we want to extract only the phone number and drop the rest of the text?
+pattern = "[[:digit:]]{3}-[[:digit:]]{4}|[[:digit:]]{3} [[:digit:]]{4}|[1-9][0-9]{9}"
+print(regmatches(x, gregexpr(pattern,x)))
+
+#Or use the stringr package, which is a lot better
+library(stringr)
+str_extract(x,pattern)
+```
+
+## Using *grep* for emails
+
+Now we use grep to extract emails by looking for the "@" sign in the text string. We would proceed as in the following example. 
+
+```{r}
+x = c("sanjiv das","srdas@scu.edu","SCU","data@science.edu")
+print(grep("\\@",x))
+print(x[grep("\\@",x)])
+```
+
+You get the idea. Using the functions **gsub**, **grep**, **regmatches**, and **gregexpr**, you can manage most fancy string handling that is needed. 
+
+## Extracting Text from the Web using APIs
+
+We now look to getting text from the web and using various APIs from different services like Twitter, Facebook, etc. You will need to open free developer accounts to do this on each site. You will also need the special R packages for each different source.
+
+## Twitter
+
+The Twitter API needs a lot of handshaking...
+
+```{r, eval=FALSE}
+##TWITTER EXTRACTOR
+library(twitteR)
+library(ROAuth)
+library(RCurl)
+download.file(url="https://curl.haxx.se/ca/cacert.pem",destfile="cacert.pem")
+#certificate file based on Privacy Enhanced Mail (PEM) protocol: https://en.wikipedia.org/wiki/Privacy-enhanced_Electronic_Mail
+
+cKey = "h4J3x0i5qwskgD58E1t5JCEnw"  #These are my keys and won't work for you
+cSecret = "fi4SOHENdsweNySeQKWe95SuBIRx74Xjv0Cx4EZx59QKwg"   #use your own secret
+reqURL = "https://api.twitter.com/oauth/request_token"
+accURL = "https://api.twitter.com/oauth/access_token"
+authURL = "https://api.twitter.com/oauth/authorize"
+
+#NOW SUBMIT YOUR CODES AND ASK FOR CREDENTIALS
+cred = OAuthFactory$new(consumerKey=cKey, consumerSecret=cSecret,requestURL=reqURL, accessURL=accURL,authURL=authURL)
+cred$handshake(cainfo="cacert.pem") #Asks for token
+
+#Test and save credentials
+#registerTwitterOAuth(cred)
+#save(list="cred",file="twitteR_credentials")
+#FIRST PHASE DONE
+
+```
+
+## Accessing Twitter
+
+```{r, eval=FALSE}
+##USE httr, SECOND PHASE
+library(httr)
+#options(httr_oauth_cache=T)
+accToken = "18666236-DmawqsDE1wwbpvPbDcw9kwt9yThGeyYhjfpVVywrHuhOQ"
+accTokenSecret = "cttbpxpTtfrwqasqJn7wrCP36I59omNI5GQHXXgV41sKwUgc"
+setup_twitter_oauth(cKey,cSecret,accToken,accTokenSecret)  #At prompt type 1
+```
+
+This completes the handshaking with Twitter. Now we can access tweets using the functions in the **twitteR** package.
+
+## Using the *twitteR* package
+
+```{r, eval=FALSE}
+#EXAMPLE 1
+s = searchTwitter("#GOOG")  #This is a list
+s
+
+#CONVERT TWITTER LIST TO TEXT ARRAY (see documentation in twitteR package)
+twts = twListToDF(s)  #This gives a dataframe with the tweets
+names(twts)
+
+twts_array = twts$text
+print(twts$retweetCount)
+twts_array
+
+#EXAMPLE 2
+s = getUser("srdas")
+fr = s$getFriends()
+print(length(fr))
+print(fr[1:10])
+s_tweets = userTimeline("srdas",n=20)
+print(s_tweets)
+
+getCurRateLimitInfo(c("srdas"))
+```
+
+## Getting Streaming Data from Twitter
+
+This assumes you have a working twitter account and have already connected R to it using twitteR package.
+
+- Retriving tweets for a particular search query
+- Example 1 adapted from http://bogdanrau.com/blog/collecting-tweets-using-r-and-the-twitter-streaming-api/
+- Additional reference: https://cran.r-project.org/web/packages/streamR/streamR.pdf
+
+```{r,eval=FALSE}
+library(streamR)
+filterStream(file.name = "tweets.json", # Save tweets in a json file
+             track = "useR_Stanford" , # Collect tweets with useR_Stanford over 60 seconds. Can use twitter handles or keywords.
+             language = "en",
+             timeout = 60, # Keep connection alive for 60 seconds
+             oauth = cred) # Use OAuth credentials
+
+tweets.df <- parseTweets("tweets.json", simplify = FALSE) # parse the json file and save to a data frame called tweets.df. Simplify = FALSE ensures that we include lat/lon information in that data frame.
+```
+
+
+## Retrieving tweets of a particular user over a 60 second time period
+
+```{r,eval=FALSE}
+filterStream(file.name = "tweets.json", # Save tweets in a json file
+             track = "3497513953" , # Collect tweets from useR2016 feed over 60 seconds. Must use twitter ID of the user.
+             language = "en",
+             timeout = 60, # Keep connection alive for 60 seconds
+             oauth = cred) # Use my_oauth file as the OAuth credentials
+tweets.df <- parseTweets("tweets.json", simplify = FALSE)
+```
+
+
+## Streaming messages from the accounts your user follows.
+
+```{r,eval=FALSE}
+userStream( file.name="my_timeline.json", with="followings",tweets=10, oauth=cred )
+```
+
+
+
+## Facebook
+
+Now we move on to using Facebook, which is a little less trouble than Twitter. Also the results may be used for creating interesting networks.
+
+```{r, eval=FALSE}
+##FACEBOOK EXTRACTOR
+library(Rfacebook)
+library(SnowballC)
+library(Rook)
+library(ROAuth)
+app_id = "847732371920076"   # USE YOUR OWN IDs
+app_secret = "a12wsa0a2ec908d9e00fcd3c619cad7d043"
+fb_oauth = fbOAuth(app_id,app_secret,extended_permissions=TRUE)
+#save(fb_oauth,file="fb_oauth")
+
+#DIRECT LOAD
+load("fb_oauth")
+```
+
+## Examples
+
+```{r, eval=FALSE}
+##EXAMPLES
+bbn = getUsers("bloombergnews",token=fb_oauth)
+print(bbn)
+
+page = getPage(page="bloombergnews",token=fb_oauth,n=20)
+print(dim(page))
+
+print(head(page))
+
+print(names(page))
+
+print(page$message)
+
+print(page$message[11])
+```
+
+## Yelp - Setting up an authorization
+
+First we examine the protocol for connecting to the Yelp API. This assumes you have opei
+
+```{r, eval=FALSE}
+###CODE to connect to YELP.
+consumerKey = "z6w-Or6awsHSyKbdUTmV9lbOA"
+consumerSecret = "ImUufP3yU9qwasFmNWWx54NUbNEBcj8"
+token = "mBzEBjhYIGgJZnmtTHwasLVdQ-0cyfFVRGu"
+token_secret = "v0FGCL0TS_dFDWawsdFwH3HptDZhiLE"
+```
+
+## Yelp - handshaking with the API
+
+```{r, eval=FALSE}
+require(httr)
+require(httpuv)
+require(jsonlite)
+# authorization
+myapp = oauth_app("YELP", key=consumerKey, secret=consumerSecret)
+sig=sign_oauth1.0(myapp, token=token,token_secret=token_secret)
+```
+
+```{r, eval=FALSE}
+## Searching the top ten bars in Chicago and SF.
+limit <- 10
+
+# 10 bars in Chicago
+yelpurl <- paste0("http://api.yelp.com/v2/search/?limit=",limit,"&location=Chicago%20IL&term=bar")
+# or 10 bars by geo-coordinates
+yelpurl <- paste0("http://api.yelp.com/v2/search/?limit=",limit,"&ll=37.788022,-122.399797&term=bar")
+
+locationdata=GET(yelpurl, sig)
+locationdataContent = content(locationdata)
+locationdataList=jsonlite::fromJSON(toJSON(locationdataContent))
+head(data.frame(locationdataList))
+
+for (j in 1:limit) {
+  print(locationdataContent$businesses[[j]]$snippet_text)
+}
+```
+
+
+
+
+## Cosine Similarity in the Text Domain
+
+In this segment we will learn some popular functions on text that are used in practice. One of the first things we like to do is to find similar text or like sentences (think of web search as one application). Since documents are vectors in the TDM, we may want to find the closest vectors or compute the distance between vectors.
+
+$$ cos(\theta) = \frac{A \cdot B}{||A|| \times ||B||}  $$
+
+where $||A|| = \sqrt{A \cdot A}$, is the dot product of $A$ with itself, also known as the norm of $A$. This gives the cosine of the angle between the two vectors and is zero for orthogonal vectors and 1 for identical vectors.
+
+```{r}
+#COSINE DISTANCE OR SIMILARITY
+A = as.matrix(c(0,3,4,1,7,0,1))
+B = as.matrix(c(0,4,3,0,6,1,1))
+cos = t(A) %*% B / (sqrt(t(A)%*%A) * sqrt(t(B)%*%B))
+print(cos)
+
+library(lsa)
+#THE COSINE FUNCTION IN LSA ONLY TAKES ARRAYS
+A = c(0,3,4,1,7,0,1)
+B = c(0,4,3,0,6,1,1)
+print(cosine(A,B))
+```
+
+## Dictionaries - I
+
+1. Webster's defines a "dictionary" as "...a reference source in print or electronic form containing words usually alphabetically arranged along with information about their forms, pronunciations, functions, etymologies, meanings, and syntactical and idiomatic uses."
+
+2. The Harvard General Inquirer: http://www.wjh.harvard.edu/~inquirer/
+
+3. Standard Dictionaries: www.dictionary.com, and www.merriam-webster.com.
+
+4. Computer dictionary: http://www.hyperdictionary.com/computer that contains about 14,000 computer related words, such as "byte" or "hyperlink". 
+
+5. Math dictionary, such as http://www.amathsdictionaryforkids.com/dictionary.html.
+
+6. Medical dictionary, see http://www.hyperdictionary.com/medical.
+
+## Dictionaries - II
+
+1. Internet lingo dictionaries may be used to complement standard dictionaries with words that are not usually found in standard language, for example, see http://www.netlingo.com/dictionary/all.php for words such as "2BZ4UQT" which stands for "too busy for you cutey" (LOL). When extracting text messages, postings on Facebook, or stock message board discussions, internet lingo does need to be parsed and such a dictionary is very useful. 
+
+2. Associative dictionaries are also useful when trying to find context, as the word may be related to a concept, identified using a dictionary such as 
+http://www.visuwords.com/. This dictionary doubles up as a thesaurus, as it provides alternative words and phrases that mean the same thing, and also related concepts. 
+
+3. Value dictionaries deal with values and may be useful when only affect (positive or negative) is insufficient for scoring text. The Lasswell Value Dictionary http://www.wjh.harvard.edu/~inquirer/lasswell.htm may be used to score the loading of text on the eight basic value categories: Wealth, Power, Respect, Rectitude, Skill, Enlightenment, Affection, and Well being.
+
+## Lexicons
+
+1. A **lexicon** is defined by Webster's as "a book containing an alphabetical arrangement of the words in a language and their definitions; the vocabulary of a language, an individual speaker or group of speakers, or a subject; the total stock of morphemes in a language." This suggests it is not that different from a dictionary. 
+
+2. A "morpheme" is defined as "a word or a part of a word that has a meaning and that contains no smaller part that has a meaning."
+
+3. In the text analytics realm, we will take a lexicon to be a smaller, special purpose dictionary, containing words that are relevant to the domain of interest. 
+
+4. The benefit of a lexicon is that it enables focusing only on words that are relevant to the analytics and discards words that are not. 
+
+5. Another benefit is that since it is a smaller dictionary, the computational effort required by text analytics algorithms is drastically reduced.
+
+## Constructing a lexicon
+
+1. By hand. This is an effective technique and the simplest. It calls for a human reader who scans a representative sample of text documents and culls important words that lend interpretive meaning.
+
+2. Examine the term document matrix for most frequent words, and pick the ones that have high connotation for the classification task at hand.
+
+3. Use pre-classified documents in a text corpus. We analyze the separate groups of documents to find words whose difference in frequency between groups is highest. Such words are likely to be better in discriminating between groups.
+
+## Lexicons as Word Lists
+
+1. Das and Chen (2007) constructed a lexicon of about 375 words that are useful in parsing sentiment from stock message boards. This lexicon also introduced the notion of "negation tagging" into the literature. 
+
+2. Loughran and McDonald (2011):
+- Taking a sample of 50,115 firm-year 10-Ks from 1994 to 2008, they found that almost three-fourths of the words identified as negative by the Harvard Inquirer dictionary  are not typically negative words in a financial context.
+- Therefore, they specifically created separate lists of words by the following attributes of words: negative, positive, uncertainty, litigious, strong modal, and weak modal. Modal words are based on Jordan's categories of strong and weak modal words. These word lists may be downloaded from http://www3.nd.edu/~mcdonald/Word_Lists.html. 
+
+## Scoring Text
+
+- Text can be scored using dictionaries and word lists. Here is an example of mood scoring. We use a psychological dictionary from Harvard. There is also WordNet. 
+
+- WordNet is a large database of words in English, i.e., a lexicon. The repository is at http://wordnet.princeton.edu.   WordNet groups words together based on their meanings (synonyms) and hence may be used as a thesaurus. WordNet is also useful for natural language processing as it provides word lists by language category, such as noun, verb, adjective, etc.
+
+## Mood Scoring using Harvard Inquirer
+
+<img src = "hgi.png" width=700 height=550>
+
+## Creating Positive and Negative Word Lists
+
+```{r}
+#MOOD SCORING USING HARVARD INQUIRER
+#Read in the Harvard Inquirer Dictionary
+#And create a list of positive and negative words
+HIDict = readLines("inqdict.txt")
+dict_pos = HIDict[grep("Pos",HIDict)]
+poswords = NULL
+for (s in dict_pos) {
+	s = strsplit(s,"#")[[1]][1]
+	poswords = c(poswords,strsplit(s," ")[[1]][1])
+}
+dict_neg = HIDict[grep("Neg",HIDict)]
+negwords = NULL
+for (s in dict_neg) {
+	s = strsplit(s,"#")[[1]][1]
+	negwords = c(negwords,strsplit(s," ")[[1]][1])
+}
+poswords = tolower(poswords)
+negwords = tolower(negwords)
+print(sample(poswords,25))
+print(sample(negwords,25))
+poswords = unique(poswords)
+negwords = unique(negwords)
+print(length(poswords))
+print(length(negwords))
+```
+
+The preceding code created two arrays, one of positive words and another of negative words. 
+
+## One Function to Rule All Text
+
+In order to score text, we need to clean it first and put it into an array to compare with the word list of positive and negative words. I wrote a general purpose function that grabs text and cleans it up for further use.
+
+```{r}
+library(tm)
+library(stringr)
+#READ IN TEXT FOR ANALYSIS, PUT IT IN A CORPUS, OR ARRAY, OR FLAT STRING
+#cstem=1, if stemming needed
+#cstop=1, if stopwords to be removed
+#ccase=1 for lower case, ccase=2 for upper case
+#cpunc=1, if punctuation to be removed
+#cflat=1 for flat text wanted, cflat=2 if text array, else returns corpus
+read_web_page = function(url,cstem=0,cstop=0,ccase=0,cpunc=0,cflat=0) {
+    text = readLines(url)
+    text = text[setdiff(seq(1,length(text)),grep("<",text))]
+    text = text[setdiff(seq(1,length(text)),grep(">",text))]
+    text = text[setdiff(seq(1,length(text)),grep("]",text))]
+    text = text[setdiff(seq(1,length(text)),grep("}",text))]
+    text = text[setdiff(seq(1,length(text)),grep("_",text))]
+    text = text[setdiff(seq(1,length(text)),grep("\\/",text))]
+    ctext = Corpus(VectorSource(text))
+    if (cstem==1) { ctext = tm_map(ctext, stemDocument) }
+    if (cstop==1) { ctext = tm_map(ctext, removeWords, stopwords("english"))}
+    if (cpunc==1) { ctext = tm_map(ctext, removePunctuation) }
+    if (ccase==1) { ctext = tm_map(ctext, tolower) }
+    if (ccase==2) { ctext = tm_map(ctext, toupper) }
+    text = ctext
+    #CONVERT FROM CORPUS IF NEEDED
+    if (cflat>0) {
+        text = NULL
+        for (j in 1:length(ctext)) {
+            temp = ctext[[j]]$content
+            if (temp!="") { text = c(text,temp) }
+        }
+        text = as.array(text)
+    }
+    if (cflat==1) {
+        text = paste(text,collapse="\n")
+        text = str_replace_all(text, "[\r\n]" , " ")
+    }
+    result = text
+}
+```
+
+## Example
+
+Now apply this function and see how we can get some clean text.
+
+```{r}
+url = "http://algo.scu.edu/~sanjivdas/research.htm"
+res = read_web_page(url,0,0,0,1,1)
+print(res)
+```
+
+## Mood Scoring Text
+
+Now we will take a different page of text and mood score it.
+
+```{r}
+#EXAMPLE OF MOOD SCORING
+library(stringr)
+url = "http://algo.scu.edu/~sanjivdas/bio-candid.html"
+text = read_web_page(url,cstem=0,cstop=0,ccase=0,cpunc=1,cflat=1)
+print(text)
+
+text = str_replace_all(text,"nbsp"," ")
+text
+
+text = unlist(strsplit(text," "))
+print(text)
+posmatch = match(text,poswords)
+numposmatch = length(posmatch[which(posmatch>0)])
+negmatch = match(text,negwords)
+numnegmatch = length(negmatch[which(negmatch>0)])
+print(c(numposmatch,numnegmatch))
+
+#FURTHER EXPLORATION OF THESE OBJECTS
+print(length(text))
+print(posmatch)
+print(text[77])
+print(poswords[204])
+is.na(posmatch)
+```
+
+## Language Detection
+
+We may be scraping web sites from many countries and need to detect the language and then translate it into English for mood scoring. The useful package **textcat** enables us to categorize the language. 
+
+```{r}
+library(textcat)
+text = c("Je suis un programmeur novice.",
+         "I am a programmer who is a novice.",
+         "Sono un programmatore alle prime armi.",
+         "Ich bin ein Anfänger Programmierer",
+         "Soy un programador con errores.")
+
+lang = textcat(text)
+print(lang)
+```
+
+## Language Translation
+
+And of course, once the language is detected, we may translate it into English. 
+
+```{r}
+library(translate)
+set.key("AIzaSyDIB8qQTmhLlbPNN38Gs4dXnlNqaws4a7lRrHQ")
+print(translate(text[1],"fr","en"))
+print(translate(text[3],"it","en"))
+print(translate(text[4],"de","en"))
+print(translate(text[5],"es","en"))
+```
+
+This requires a Google API for which you need to set up a paid account. 
+
+
+
+## Text Classification
+
+1. Machine classification is, from a layman's point of view, nothing but learning by example. In new-fangled modern parlance, it is a technique in the field of "machine learning".
+
+2. Learning by machines falls into two categories, supervised and unsupervised. When a number of explanatory $X$ variables are used to determine some outcome $Y$, and we train an algorithm to do this, we are performing supervised (machine) learning. The outcome $Y$ may be a dependent variable (for example, the left hand side in a linear regression), or a classification (i.e., discrete outcome).
+
+3. When we only have $X$ variables and no separate outcome variable $Y$, we perform unsupervised learning. For example, cluster analysis produces groupings based on the $X$ variables of various entities, and is a common example. 
+
+## Classification Algorithms
+
+We start with a simple example on numerical data befoe discussing how this is to be applied to text. We first look at the Bayes classifier.
+
+## Bayes Classifier - 1
+
+Bayes classification extends the Document-Term model with a document-term-classification model. These are the three entities in the model and we denote them as $(d,t,c)$. Assume that there are $D$ documents to classify into $C$ categories, and we employ a dictionary/lexicon (as the case may be) of $T$ terms or words. Hence we have $d_i, i = 1, ... , D$, and $t_j, j = 1, ... , T$. And correspondingly the categories for classification are $c_k, k = 1, ... , C$. 
+
+## Bayes Classifier - 2
+
+Suppose we are given a text corpus of stock market related documents (tweets for example), and wish to classify them into bullish ($c_1$), neutral ($c_2$), or bearish ($c_3$), where $C=3$. We first need to train the Bayes classifier using a training data set, with pre-classified documents, numbering $D$. For each term $t$ in the lexicon, we can compute how likely it is to appear in documents in each class $c_k$. Therefore, for each class, there is a $T$-sided dice with each face representing a term and having a probability of coming up. These dice are the prior probabilities of seeing a word for each class of document. We denote these probabilities succinctly as $p(t | c)$. For example in a bearish document, if the word "sell" comprises 10% of the words that appear, then $p(t=\mbox{sell} | c=\mbox{bearish})=0.10$. 
+
+## Bayes Classifier - 3
+
+In order to ensure that just because a word does not appear in a class, it has a non-zero probability we compute the probabilities as follows:
+
+$$
+\begin{equation}
+p(t | c) = \frac{n(t | c) + 1}{n(c)+T}
+\end{equation}
+$$
+
+where $n(t | c)$ is the number of times word $t$ appears in category $c$, and $n(c) = \sum_t n(t | c)$ is the total number of words in the training data in class $c$. Note that if there are no words in the class $c$, then each term $t$ has probability $1/T$. 
+
+## Bayes Classifier - 4
+
+A document $d_i$ is a collection or set of words $t_j$. The probability of seeing a given document in each category is given by the following *multinomial* probability:
+
+$$
+\begin{equation}
+p(d | c) = \frac{n(d)!}{n(t_1|d)! \cdot n(t_2|d)! \cdots n(t_T|d)!} \times p(t_1 | c) \cdot p(t_2 | c) \cdots p(t_T | c)  \nonumber
+\end{equation}
+$$
+
+where $n(d)$ is the number of words in the document, and $n(t_j | d)$ is the number of occurrences of word $t_j$ in the same document $d$. These $p(d | c)$ are the prior probabilities in the Bayes classifier, computed from all documents in the training data. The posterior probabilities are computed for each document in the test data as follows:
+
+$$
+\begin{equation}
+p(c | d) = \frac{p(d | c) p(c)}{\sum_k \; p(d | c_k) p(c_k)}, \forall k = 1, \ldots, C  \nonumber
+\end{equation}
+$$
+
+Note that we get $C$ posterior probabilities for document $d$, and assign the document to class $\max_k c_k$, i.e., the class with the highest posterior probability for the given document. 
+
+## Naive Bayes in R
+
+We use the **e1071** package. It has a one-line command that takes in the tagged training dataset using the function **naiveBayes()**. It returns the trained classifier model. 
+
+The trained classifier contains the unconditional probabilities $p(c)$ of each class, which are merely frequencies with which each document appears. It also shows the conditional probability distributions $p(t |c)$ given as the mean and standard deviation of the occurrence of these terms in each class. We may take this trained model and re-apply to the training data set to see how well it does. We use the **predict()** function for this. The data set here is the classic Iris data. 
+
+For text mining, the feature set in the data will be the set of all words, and there will be one column for each word. Hence, this will be a large feature set. In order to keep this small, we may instead reduce the number of words by only using a lexicon's words as the set of features. This will vastly reduce and make more specific the feature set used in the classifier. 
+
+## Example
+
+```{r}
+library(e1071)
+data(iris)
+print(head(iris))
+tail(iris)
+
+#NAIVE BAYES
+res = naiveBayes(iris[,1:4],iris[,5])
+#SHOWS THE PRIOR AND LIKELIHOOD FUNCTIONS
+res
+
+#SHOWS POSTERIOR PROBABILITIES
+predict(res,iris[,1:4],type="raw")
+
+#CONFUSION MATRIX
+out = table(predict(res,iris[,1:4]),iris[,5])
+out
+```
+
+
+## Support Vector Machines (SVM) - 1
+
+The goal of the SVM is to map a set of entities with inputs $X=\{x_1,x_2,\ldots,x_n\}$ of dimension $n$, i.e., $X \in R^n$, into a set of categories $Y=\{y_1,y_2,\ldots,y_m\}$ of dimension $m$, such that the $n$-dimensional $X$-space is divided using hyperplanes, which result in the maximal separation between classes $Y$. A hyperplane is the set of points ${\bf x}$ satisfying the equation
+
+$$
+{\bf w} \cdot {\bf x} = b
+$$
+
+where $b$ is a scalar constant, and ${\bf w} \in R^n$ is the normal vector to the hyperplane, i.e., the vector at right angles to the plane. The distance between this hyperplane and ${\bf w} \cdot {\bf x} = 0$ is given by $b/||{\bf w}||$, where $||{\bf w}||$ is the norm of vector ${\bf w}$. 
+
+## SVM - 2
+
+This set up is sufficient to provide intuition about how the SVM is implemented. Suppose we have two categories of data, i.e., $y = \{y_1, y_2\}$. Assume that all points in category $y_1$ lie above a hyperplane ${\bf w} \cdot {\bf x} = b_1$, and all points in category $y_2$ lie below a hyperplane ${\bf w} \cdot {\bf x} = b_2$, then the distance between the two hyperplanes is $\frac{|b_1-b_2|}{||{\bf w}||}$. 
+
+```{r}
+#Example of hyperplane geometry
+w1 = 1; w2 = 2
+b1 = 10
+#Plot hyperplane in x1, x2 space
+x1 = seq(-3,3,0.1)
+x2 = (b1-w1*x1)/w2
+plot(x1,x2,type="l")
+#Create hyperplane 2
+b2 = 8
+x2 = (b2-w1*x1)/w2
+lines(x1,x2,col="red")
+#Compute distance to hyperplane 2
+print(abs(b1-b2)/sqrt(w1^2+w2^2))
+```
+
+We see that this gives the perpendicular distance between the two parallel hyperplanes. 
+
+The goal of the SVM is to maximize the distance (separation) between the two hyperplanes, and this is achieved by minimizing norm $||{\bf w}||$. This naturally leads to a quadratic optimization problem.
+
+$$
+\begin{equation}
+\min_{b_1,b_2,{\bf w}} \frac{1}{2} ||{\bf w}||
+\end{equation}
+$$
+
+subject to ${\bf w} \cdot {\bf x} \geq b_1$ for points in category $y_1$ and ${\bf w} \cdot {\bf x} \leq  b_2$ for points in category $y_2$. Note that this program may find a solution where many of the elements of ${\bf w}$ are zero, i.e., it also finds the minimal set of "support" vectors that separate the two groups. The "half" in front of the minimand is for mathematical convenience in solving the quadratic program. 
+
+## SVM - 3
+
+Of course, there may be no linear hyperplane that perfectly separates the two groups. This slippage may be accounted for in the SVM by allowing for points on the wrong side of the separating hyperplanes using cost functions, i.e., we modify the quadratic program as follows: 
+
+$$
+\begin{equation}
+\min_{b_1,b_2,{\bf w},\{\eta_i\}} \frac{1}{2} ||{\bf w}|| + C_1 \sum_{i=1}^n \eta_i + C_2 \sum_{i=1}^n \eta_i
+\end{equation}
+$$ 
+where $C_1,C_2$ are the costs for slippage in groups 1 and 2, respectively. Often implementations assume $C_1=C_2$. The values $\eta_i$ are positive for observations that are not perfectly separated, i.e., lead to slippage. Thus, for group 1, these are the length of the perpendicular amounts by which observation $i$ lies below the hyperplane ${\bf w} \cdot {\bf x} = b_1$, i.e., lies on the hyperplane ${\bf w} \cdot {\bf x} = b_1 - \eta_i$. For group 1, these are the length of the perpendicular amounts by which observation $i$ lies above the hyperplane ${\bf w} \cdot {\bf x} = b_2$, i.e., lies on the hyperplane ${\bf w} \cdot {\bf x} = b_1 + \eta_i$. For observations within the respective hyperplanes, of course, $\eta_i=0$. 
+
+## Example of SVM with Confusion Matrix
+
+```{r}
+library(e1071)
+
+#EXAMPLE 1 for SVM
+model = svm(iris[,1:4],iris[,5])
+model
+
+out = predict(model,iris[,1:4])
+out
+
+print(length(out))
+table(matrix(out),iris[,5])
+```
+
+So it does marginally better than naive Bayes. Here is another example.
+
+## Another example
+
+```{r}
+
+#EXAMPLE 2 for SVM
+train_data = matrix(rpois(60,3),10,6)
+print(train_data)
+train_class = as.matrix(c(2,3,1,2,2,1,3,2,3,3))
+print(train_class)
+
+library(e1071)
+model = svm(train_data,train_class)
+model
+
+pred = predict(model,train_data, type="raw")
+table(pred,train_class)
+
+train_fitted = round(pred,0)
+print(cbind(train_class,train_fitted))
+train_fitted = matrix(train_fitted)
+table(train_class,train_fitted)
+```
+
+## Statistical Significance of the Confusion Matrix
+
+How do we know if the confusion matrix shows statistically significant classification power? We do a chi-square test.
+
+```{r}
+
+library(e1071)
+res = naiveBayes(iris[,1:4],iris[,5])
+pred = predict(res,iris[,1:4])
+out = table(pred,iris[,5])
+out
+
+chisq.test(out)
+```
+
+
+
+
+## Word count classifiers, adjectives, and adverbs
+
+1. Given a lexicon of selected words, one may sign the words as positive or negative, and then do a simple word count to compute net sentiment or mood of text. By establishing appropriate cut offs, one can determine the classification of text into optimistic, neutral, or pessimistic. These cut offs are determined using the training and testing data sets. 
+
+2. Word count classifiers may be enhanced by focusing on "emphasis words" such as adjectives and adverbs, especially when classifying emotive content. One approach used in Das and Chen (2007)  is to identify all adjectives and adverbs in the text and then only consider words that are within $\pm 3$ words before and after the adjective or adverb. This extracts the most emphatic parts of the text only, and then mood scores it. 
+
+## Fisher's discriminant
+
+- Fisher's discriminant is simply the ratio of the variation of a given word across groups to the variation within group.
+
+- More formally, Fisher's discriminant score $F(w)$ for word $w$ is
+
+$$
+\begin{equation}
+F(w) = \frac{\frac{1}{K} \sum_{j=1}^K ({\bar w}_j - {\bar w}_0)^2}{\frac{1}{K} \sum_{j=1}^K    \sigma_j^2}   \nonumber
+\end{equation}
+$$
+
+where $K$ is the number of categories and ${\bar w}_j$ is the mean occurrence of the word $w$ in each text in category $j$, and ${\bar w}_0$ is the mean occurrence across all categories. And $\sigma_j^2$ is the variance of the word occurrence in category $j$. This is just one way in which Fisher's discriminant may be calculated, and there are other variations on the theme.
+
+- We may compute $F(w)$ for each word $w$, and then use it to weight the word counts of each text, thereby giving greater credence to words that are better discriminants.
+
+## Vector-Distance Classifier
+
+Suppose we have 500 documents in each of two categories, bullish and bearish. These 1,000 documents may all be placed as points in $n$-dimensional space. It is more than likely that the points in each category will lie closer to each other than to the points in the other category. Now, if we wish to classify a new document, with vector $D_i$, the obvious idea is to look at which cluster it is closest to, or which point in either cluster it is closest to. The closeness between two documents $i$ and $j$ is determined easily by the well known metric of cosine distance, i.e., 
+
+$$
+\begin{equation}
+1 - \cos(\theta_{ij}) = 1 - \frac{D_i^\top D_j}{||D_i|| \cdot ||D_j||}   \nonumber
+\end{equation}
+$$
+
+where $||D_i|| = \sqrt{D_i^\top D_i}$ is the norm of the vector $D_i$. The cosine of the angle between the two document vectors is 1 if the two vectors are identical, and in this case the distance between them would be zero. 
+
+
+## Metrics: Confusion matrix
+
+The confusion matrix is the classic tool for assessing classification accuracy. Given $n$ categories, the matrix is of dimension $n \times n$. The rows relate to the category assigned by the analytic algorithm and the columns refer to the correct category in which the text resides. Each cell $(i,j)$ of the matrix contains the number of text messages that were of type $j$ and were classified as type $i$. The cells on the diagonal of the confusion matrix state the number of times the algorithm got the classification right. All other cells are instances of classification error. If an algorithm has no classification ability, then the rows and columns of the matrix will be independent of each other. Under this null hypothesis, the statistic that is examined for rejection is as follows:
+
+$$
+\chi^2[dof=(n-1)^2] = \sum_{i=1}^n \sum_{j=1}^n \frac{[A(i,j) - E(i,j)]^2}{E(i,j)} 
+$$
+
+where $A(i,j)$ are the actual numbers observed in the confusion matrix, and $E(i,j)$ are the expected numbers, assuming no classification ability under the null. If $T(i)$ represents the total across row $i$ of the confusion matrix, and $T(j)$ the column total, then 
+
+$$
+E(i,j) = \frac{T(i) \times T(j)}{\sum_{i=1}^n T(i)} \equiv \frac{T(i) \times T(j)}{\sum_{j=1}^n T(j)}
+$$
+
+The degrees of freedom of the $\chi^2$ statistic is $(n-1)^2$. This statistic is very easy to implement and may be applied to models for any $n$. A highly significant statistic is evidence of classification ability. 
+
+## Accuracy
+
+Algorithm accuracy over a classification scheme is the percentage of text that is correctly classified. This may be done in-sample or out-of-sample. To compute this off the confusion matrix, we calculate
+
+$$
+\mbox{Accuracy} = \frac{ \sum_{i=1}^K O(i,i)}{\sum_{j=1}^K M(j)} = \frac{ \sum_{i=1}^K O(i,i)}{\sum_{i=1}^K M(i)}
+$$
+
+We should hope that this is at least greater than $1/K$, which is the accuracy level achieved on average from random guessing. 
+
+## Sentiment over Time
+
+<img src = "dell_senty_plot.png" width=600 height=350>
+
+## Stock Sentiment Correlations
+
+<img src = "StkSentCorr.png" width=700 height=650>
+
+## Phase Lag Analysis
+
+<img src = "PhaseLagAnalysis.png" width=700 height=550>
+
+
+
+## False Positives
+
+1. The percentage of false positives is a useful metric to work with. It may be calculated as a simple count or as a weighted count (by nearness of wrong category) of false classifications divided by total classifications undertaken.
+
+2. For example, assume that in the example above, category 1 is BULLISH and category 3 is BEARISH, whereas category 2 is NEUTRAL. The false positives would arise from mis-classifying category 1 as 3 and vice-versa. We compute the false positive rate for illustration. 
+
+3. The false positive rate is just 1% in the example below.
+
+```{r}
+Omatrix = matrix(c(22,1,0,3,44,3,1,1,25),3,3)
+print((Omatrix[1,3]+Omatrix[3,1])/sum(Omatrix))
+```
+
+## Sentiment Error
+
+In a 3-way classification scheme, where category 1 is BULLISH and category 3 is BEARISH, whereas category 2 is NEUTRAL, we can compute this metric as follows. 
+
+$$
+\begin{equation}
+\mbox{Sentiment Error} = 1 - \frac{M(j=1)-M(j=3)}{M(i=1)-M(i=3)}  \nonumber
+\end{equation}
+$$
+
+In our illustrative example, we may easily calculate this metric. The classified sentiment from the algorithm was $-3 = 23-27$, whereas it actually should have been $-2 = 26-28$. The percentage error in sentiment is 50%. 
+
+```{r}
+print(Omatrix)
+rsum = rowSums(Omatrix)
+csum = colSums(Omatrix)
+print(rsum)
+print(csum)
+print(1 - (-3)/(-2))
+```
+
+## Disagreement
+
+The metric uses the number of signed buys and sells in the day (based on a sentiment model) to determine how much difference of opinion there is in the market. The metric is computed as follows:
+
+$$
+\mbox{DISAG} = \left| 1 - \left|  \frac{B-S}{B+S} \right| \right|
+$$
+
+where $B, S$ are the numbers of classified buys and sells.  Note that DISAG is bounded between zero and one. 
+
+Using the true categories of buys (category 1 BULLISH) and sells (category 3 BEARISH) in the same example as before, we may compute disagreement. Since there is little agreement (26 buys and 28 sells), disagreement is high. 
+
+```{r}
+print(Omatrix)
+DISAG = abs(1-abs((26-28)/(26+28)))
+print(DISAG)
+```
+
+## Precision and Recall
+
+The creation of the confusion matrix leads naturally to two measures that are associated with it. 
+
+Precision is the fraction of positives identified that are truly positive, and is also known as positive predictive value. It is a measure of usefulness of prediction. So if the algorithm (say) was tasked with selecting those account holders on LinkedIn who are actually looking for a job, and it identifies $n$ such people of which only $m$ were really looking for a job, then the precision would be $m/n$. 
+
+Recall is the proportion of positives that are correctly identified, and is also known as sensitivity. It is a measure of how complete the prediction is. If the actual number of people looking for a job on LinkedIn was $M$, then recall would be $n/M$. 
+
+For example, suppose we have the following confusion matrix. 
+
+|                 | **Actual**      |             |    |
+|-----------------|-----------------|-------------|----|
+| **Predicted**   | Looking for Job | Not Looking |    |
+| Looking for Job | 10              | 2           | 12 |
+| Not Looking     | 1               | 16          | 17 |
+|                 | 11              | 18          | 29 |
+
+In this case precision is $10/12$ and recall is $10/11$. Precision is related to the probability of false positives (Type I error), which is one minus precision. Recall is related to the probability of false negatives (Type II error), which is one minus recall.
+
+## Using the RTextTools package
+
+This package bundles text classification algorithms into one package. 
+
+```{r}
+library(tm)
+library(RTextTools)
+
+#Create sample text with positive and negative markers
+n = 1000
+npos = round(runif(n,1,25))
+nneg = round(runif(n,1,25))
+flag = matrix(0,n,1)
+flag[which(npos>nneg)] = 1
+text = NULL
+for (j in 1:n) {
+  res = paste(c(sample(poswords,npos[j]),sample(negwords,nneg[j])),collapse=" ")
+  text = c(text,res)
+}
+
+#Text Classification
+m = create_matrix(text)
+print(m)
+m = create_matrix(text,weighting=weightTfIdf)
+print(m)
+container <- create_container(m,flag,trainSize=1:(n/2), testSize=(n/2+1):n,virgin=FALSE)
+#models <- train_models(container, algorithms=c("MAXENT","SVM","GLMNET","SLDA","TREE","BAGGING","BOOSTING","RF"))
+models <- train_models(container, algorithms=c("MAXENT","SVM","GLMNET","TREE"))
+results <- classify_models(container, models)
+analytics <- create_analytics(container, results)
+
+#RESULTS
+analytics@algorithm_summary # SUMMARY OF PRECISION, RECALL, F-SCORES, AND ACCURACY SORTED BY TOPIC CODE FOR EACH ALGORITHM
+analytics@label_summary # SUMMARY OF LABEL (e.g. TOPIC) ACCURACY
+analytics@document_summary # RAW SUMMARY OF ALL DATA AND SCORING
+analytics@ensemble_summary # SUMMARY OF ENSEMBLE PRECISION/COVERAGE. USES THE n VARIABLE PASSED INTO create_analytics()
+
+#CONFUSION MATRIX
+yhat = as.matrix(analytics@document_summary$CONSENSUS_CODE)
+y = flag[(n/2+1):n]
+print(table(y,yhat))
+
+```
+
+
+## Grading Text
+
+In recent years, the SAT exams added a new essay section. While the test aimed at assessing original writing, it also introduced automated grading. A goal of the test is to assess the writing level of the student. This is associated with the notion of *readability*.
+
+## Readability
+
+"Readability" is a metric of how easy it is to comprehend text. Given a goal of efficient markets, regulators want to foster transparency by making sure financial documents that are disseminated to the investing public are readable. Hence, metrics for readability are very important and are recently gaining traction. 
+
+## Gunning-Fog Index
+
+Gunning (1952) developed the Fog index. The index estimates the years of formal education needed to understand text on a first reading. A fog index of 12 requires the reading level of a U.S. high school senior (around 18 years old). The index is based on the idea that poor readability is associated with longer sentences and complex words. Complex words are those that have more than two syllables. The formula for the Fog index is
+
+$$
+0.4 \cdot \left[\frac{\mbox{\#words}}{\mbox{\#sentences}} + 100 \cdot  \left( \frac{\mbox{\#complex words}}{\mbox{\#words}} \right) \right]
+$$
+
+Alternative readability scores use similar ideas. The Flesch Reading Ease Score and the Flesch-Kincaid Grade Level also use counts of words, syllables, and sentences. See http://en.wikipedia.org/wiki/Flesch-Kincaid_readability_tests. The Flesch Reading Ease Score is defined as
+
+$$
+206.835 - 1.015 \left(\frac{\mbox{\#words}}{\mbox{\#sentences}}\right) - 84.6  \left( \frac{\mbox{\#syllables}}{\mbox{\#words}} \right) 
+$$
+
+With a range of 90-100 easily accessible by a 11-year old, 60-70 being easy to understand for 13-15 year olds, and 0-30 for university graduates. 
+
+
+
+## The Flesch-Kincaid Grade Level 
+
+This is defined as
+
+$$
+0.39 \left(\frac{\mbox{\#words}}{\mbox{\#sentences}}\right) + 11.8  \left( \frac{\mbox{\#syllables}}{\mbox{\#words}} \right) -15.59
+$$
+
+which gives a number that corresponds to the grade level. As expected these two measures are negatively correlated. Various other measures of readability use the same ideas as in the Fog index. For example the Coleman and Liau (1975) index does not even require a count of syllables, as follows:
+
+$$
+CLI = 0.0588 L - 0.296 S - 15.8
+$$
+
+where $L$ is the average number of letters per hundred words and $S$ is the average number of sentences per hundred words. 
+
+Standard readability metrics may not work well for financial text. Loughran and McDonald (2014) find that the Fog index is inferior to simply looking at 10-K file size. 
+
+**References**
+
+M. Coleman and T. L. Liau. (1975). A computer readability formula designed for machine scoring. *Journal of Applied Psychology* 60, 283-284.
+
+T. Loughran and W. McDonald, (2014). Measuring readability in financial disclosures, *The Journal of Finance* 69, 1643-1671.
+
+## The koRpus package
+
+R package koRpus for readability scoring here. 
+http://www.inside-r.org/packages/cran/koRpus/docs/readability
+
+First, let's grab some text from my web site. 
+
+```{r}
+library(rvest)
+url = "http://algo.scu.edu/~sanjivdas/bio-candid.html"
+
+doc.html = read_html(url)
+text = doc.html %>% html_nodes("p") %>% html_text()
+
+text = gsub("[\t\n]"," ",text)
+text = gsub('"'," ",text)   #removes single backslash
+text = paste(text, collapse=" ")
+print(text)
+```
+
+Now we can assess it for readability. 
+
+```{r}
+library(koRpus)
+write(text,file="textvec.txt")
+text_tokens = tokenize("textvec.txt",lang="en")
+#print(text_tokens)
+print(c("Number of sentences: ",text_tokens@desc$sentences))
+print(c("Number of words: ",text_tokens@desc$words))
+print(c("Number of words per sentence: ",text_tokens@desc$avg.sentc.length))
+print(c("Average length of words: ",text_tokens@desc$avg.word.length))
+```
+
+Next we generate several indices of readability, which are worth looking at. 
+
+```{r}
+print(readability(text_tokens))
+```
+
+
+## Text Summarization
+
+It is really easy to write a summarizer in a few lines of code. The function below takes in a text array and does the needful. Each element of the array is one sentence of the document we wan summarized.
+
+In the function we need to calculate how similar each sentence is to any other one. This could be done using cosine similarity, but here we use another approach, Jaccard similarity. Given two sentences, Jaccard similarity is the ratio of the size of the intersection word set divided by the size of the union set.
+
+## Jaccard Similarity
+
+A document $D$ is comprised of $m$ sentences $s_i, i=1,2,...,m$, where each $s_i$ is a set of words. We compute the pairwise overlap between sentences using the **Jaccard** similarity index: 
+
+$$
+J_{ij} = J(s_i, s_j) = \frac{|s_i \cap s_j|}{|s_i \cup s_j|} = J_{ji}
+$$
+
+The overlap is the ratio of the size of the intersect of the two word sets in sentences $s_i$ and $s_j$, divided by the size of the union of the two sets. The similarity score of each sentence is computed as the row sums of the Jaccard similarity matrix. 
+
+$$
+{\cal S}_i = \sum_{j=1}^m J_{ij}
+$$
+
+## Generating the summary
+
+Once the row sums are obtained, they are sorted and the summary is the first $n$ sentences based on the ${\cal S}_i$ values. 
+
+```{r}
+# FUNCTION TO RETURN n SENTENCE SUMMARY
+# Input: array of sentences (text)
+# Output: n most common intersecting sentences
+text_summary = function(text, n) {
+  m = length(text)  # No of sentences in input
+  jaccard = matrix(0,m,m)  #Store match index
+  for (i in 1:m) {
+    for (j in i:m) {
+      a = text[i]; aa = unlist(strsplit(a," "))
+      b = text[j]; bb = unlist(strsplit(b," "))
+      jaccard[i,j] = length(intersect(aa,bb))/
+                          length(union(aa,bb))
+      jaccard[j,i] = jaccard[i,j]
+    }
+  }
+  similarity_score = rowSums(jaccard)
+  res = sort(similarity_score, index.return=TRUE,
+          decreasing=TRUE)
+  idx = res$ix[1:n]
+  summary = text[idx]
+}
+```
+
+## Example: Summarization
+
+We will use a sample of text that I took from Bloomberg news. It is about the need for data scientists.
+
+```{r}
+url = "dstext_sample.txt"   #You can put any text file or URL here
+text = read_web_page(url,cstem=0,cstop=0,ccase=0,cpunc=0,cflat=1)
+print(length(text[[1]]))
+print("ORIGINAL TEXT")
+print(text)
+
+text2 = strsplit(text,". ",fixed=TRUE)  #Special handling of the period.
+text2 = text2[[1]]
+print("SENTENCES")
+print(text2)
+
+print("SUMMARY")
+res = text_summary(text2,5)
+print(res)
+```
+
+## Text Mining Research in Finance
+
+In this segment we explore various text mining research in the field of finance. 
+
+1. Lu, Chen, Chen, Hung, and Li (2010) categorize finance related textual content into three categories: (a) forums, blogs, and wikis; (b) news and research reports; and (c) content generated by firms. 
+
+2. Extracting sentiment and other information from messages posted to stock message boards such as Yahoo!, Motley Fool, Silicon Investor, Raging Bull, etc., see Tumarkin and Whitelaw (2001), Antweiler and Frank (2004), Antweiler and Frank (2005), Das, Martinez-Jerez and Tufano (2005), Das and Chen (2007).
+
+3. Other news sources: Lexis-Nexis, Factiva, Dow Jones News, etc., see Das, Martinez-Jerez and Tufano (2005); Boudoukh, Feldman, Kogan, Richardson (2012). 
+
+4. The Heard on the Street column in the Wall Street Journal has been used in work by Tetlock (2007), Tetlock, Saar-Tsechansky and Macskassay (2008); see also the use of Wall Street Journal articles by Lu, Chen, Chen, Hung, and Li (2010). 
+
+5. Thomson-Reuters NewsScope Sentiment Engine (RNSE) based on Infonics/Lexalytics algorithms and varied data on stocks and text from internal databases, see Leinweber and Sisk (2011). Zhang and Skiena (2010) develop a market neutral trading strategy using news media such as tweets, over 500 newspapers, Spinn3r RSS feeds, and LiveJournal.
+
+## Das and Chen (*Management Science* 2007)
+
+<img src = "DasChen2007.png" width=700 height=350>
+<img src = "DasChenSystemDesign.png" width=700 height=350>
+<img src = "OptimismScore.png" width=700 height=350>
+<img src = "AmbiguityClassification.png" width=700 height=550>
+<img src = "TechSentiment.png" width=700 height=350>
+<img src = "SentimentAndVolatility.png" width=700 height=450>
+<img src = "SentimentCorrelations.png" width=700 height=450>
+
+
+## Using Twitter and Facebook for Market Prediction
+
+1. Bollen, Mao, and Zeng (2010) claimed that stock direction of the Dow Jones Industrial Average can be predicted using tweets with 87.6% accuracy. 
+
+2. Bar-Haim, Dinur, Feldman, Fresko and Goldstein (2011) attempt to predict stock direction using tweets by detecting and overweighting the opinion of expert investors. 
+
+3. Brown (2012) looks at the correlation between tweets and the stock market via several measures. 
+
+4. Logunov (2011) uses OpinionFinder to generate many measures of sentiment from tweets. 
+
+5. Twitter based sentiment developed by Rao and Srivastava (2012) is found to be highly correlated with stock prices and indexes, as high as 0.88 for returns. 
+
+6. Sprenger and Welpe (2010) find that tweet bullishness is associated with abnormal stock returns and tweet volume predicts trading volume.
+
+## Polarity and Subjectivity
+
+Zhang and Skiena (2010) use Twitter feeds and also three other sources of text: over 500 nationwide newspapers, RSS feeds from blogs, and LiveJournal blogs. These are used to compute two metrics. 
+
+$$
+\begin{eqnarray*}
+\mbox{polarity} &=& \frac{n_{pos} - n_{neg}}{n_{pos} + n_{neg}} \\
+\mbox{subjectivity} &=& \frac{n_{pos} + n_{neg}}{N}
+\end{eqnarray*}
+$$
+
+where $N$ is the total number of words in a text document, $n_{pos}, n_{neg}$ are the number of positive and negative words, respectively.
+
+- They find that the number of articles is predictive of trading volume. 
+
+- Subjectivity is also predictive of trading volume, lending credence to the idea that differences of opinion make markets. 
+
+- Stock return prediction is weak using polarity, but tweets do seem to have some predictive power. 
+
+- Various sentiment driven market neutral strategies are shown to be profitable, though the study is not tested for robustness. 
+
+Logunov (2011) uses tweets data, and applies OpinionFinder and also developed a new classifier called Naive Emoticon Classification to encode sentiment. This is an unusual and original, albeit quite intuitive use of emoticons to determine mood in text mining. If an emoticon exists, then the tweet is automatically coded with that sentiment of emotion. Four types of emoticons are considered: Happy (H), Sad (S), Joy (J), and Cry (C). Polarity is defined here as
+\[
+\mbox{polarity} = A = \frac{n_H + n_J}{n_H + n_S + n_J + n_C}
+\]
+Values greater than 0.5 are positive. $A$ stands for aggregate sentiment and appears to be strongly autocorrelated. Overall, prediction evidence is weak. 
+
+
+## Commercial Products
+
+#### Stock Twits
+
+<img src = "StockTwits_Prices.png" width=700 height=350>
+<img src = "StockTwits_Messages.png" width=700 height=350>
+<img src = "StockTwits_Sentiment.png" width=700 height=350>
+
+#### iSentium
+
+<img src = "iSentium_iSense.png" width=700 height=350>
+<img src = "iSentium_iSense_ShortTerm.png" width=700 height=350>
+<img src = "iSentium_iSense_LongTerm.png" width=700 height=350>
+
+#### RavenPack
+
+<img src = "Ravenpack_MacroSignals.png" width=700 height=350>
+
+## Text Mining Corporate Reports
+
+- Text analysis is undertaken across companies in a cross-section. 
+
+- The quality of text in company reports is much better than in message postings. 
+
+- Textual analysis in this area has also resulted in technical improvements. Rudimentary approaches such as word count methods have been extended to weighted schemes, where weights are determined in statistical ways. In Das and Chen (2007), the discriminant score of each word across classification categories is used as a weighting index for the importance of words. 
+
+There is a proliferation of word-weighting schemes.The idea of ``inverse document frequency'' ($idf$) as a weighting coefficient. Hence, the $idf$ for word $j$ would be
+
+$$
+w_j^{idf} = \ln \left( \frac{N}{df_j}  \right)
+$$
+where $N$ is the total number of documents, and $df_j$ is the number of documents containing word $j$. This scheme was proposed by Manning and Schutze (1999). 
+
+- Loughran and McDonald (2011) use this weighting approach to modify the word (term) frequency counts in the documents they analyze. The weight on word $j$ in document $i$ is specified as 
+$$
+w_{ij} = \max[0,1 + \ln(f_{ij}) w_{j}^{idf}]
+$$
+where $f_{ij}$ is the frequency count of word $j$ in document $i$. This leads naturally to a document score of 
+$$
+S_i^{LM} = \frac{1}{1+\ln(a_i)} \sum_{j=1}^J w_{ij} 
+$$
+Here $a_i$ is the total number of words in document $i$, and $J$ is the total number of words in the lexicon. (The $LM$ superscript signifies the \cite{LoughMcD} weighting approach.)
+
+-   Whereas the $idf$ approach is intuitive, it does not have to be relevant for market activity. An alternate and effective weighting scheme has been developed in Jegadeesh and Wu (2013, JW) using market movements. Words that occur more often on large market move days are given a greater weight than other words. JW show that this scheme is superior to an unweighted one, and delivers an accurate system for determining the ``tone'' of a regulatory filing. 
+
+- JW also conduct robustness checks that suggest that the approach is quite general, and applies to other domains with no additional modifications to the specification. Indeed, they find that tone extraction from 10-Ks may be used to predict IPO underpricing. 
+
+## Tone
+
+- Jegadeesh and Wu (2013) create a ``global lexicon'' merging multiple word lists from Harvard-IV-4 Psychological Dictionaries(Harvard Inquirer), the Lasswell Value Dictionary, the Loughran and McDonald lists, and the word list in Bradley and Lang (1999). They test this lexicon for robustness by checking (a) that the lexicon delivers accurate tone scores and (b) that it is complete by discarding 50\% of the words and seeing whether it causes a material change in results (it does not). 
+
+- This approach provides a more reliable measure of document tone than preceding approaches. Their measure of **filing tone** is statistically related to filing period returns after providing for reasonable control variables. Tone is significantly related to returns for up to two weeks after filing, and it appears that the market under reacts to tone, and this is corrected within this two week window. 
+
+- The tone score of document $i$ in the JW paper is specified as
+$$
+S_i^{JW} = \frac{1}{a_i} \sum_{j=1}^J w_j f_{ij} 
+$$
+where $w_j$ is the weight for word $j$ based on its relationship to market movement. (The $JW$ superscript signifies the \cite{JegWu} weighting approach.) 
+
+- The following regression is used to determine the value of $w_j$ (across all documents). 
+$$
+\begin{eqnarray*}
+r_i &=& a + b \cdot S_j^{JW} + \epsilon_i \\
+&=& a + b \left( \frac{1}{a_i} \sum_{j=1}^J w_j f_{ij} \right) + \epsilon_i \\
+&=& a + \left( \frac{1}{a_i} \sum_{j=1}^J (b w_j) f_{ij} \right) + \epsilon_i \\
+&=& a + \left( \frac{1}{a_i} \sum_{j=1}^J B_j f_{ij} \right) + \epsilon_i 
+\end{eqnarray*}
+$$
+where $r_i$ is the abnormal return around the release of document $i$, and $B_j=b w_j$ is a modified word weight. This is then translated back into the original estimated word weight by normalization, i.e., 
+$$
+w_j = \frac{B_j - \frac{1}{J}\sum_{j=1}^J B_j}{\sigma(B_j)}
+$$
+where $\sigma(B_j)$ is the standard deviation of $B_j$ across all $J$ words in the lexicon. 
+
+- Abnormal return $r_i$ is defined as the three-day excess return over the CRSP value-weighted return. 
+\[
+r_i = \prod_{t=0}^3 ret_{it} - \prod_{t=1}^3 ret_{VW,t}
+\]
+Instead of $r_i$ as the left-hand side variable in the regression, one might also use a binary variable for good and bad news, positive or negative 10-Ks, etc., and instead of the regression we would use a limited dependent variable structure such as logit, probit, or even a Bayes classifier. However, the advantages of $r_i$ being a continuous variable are considerable for it offers a range of outcomes, and simpler regression fit. 
+
+- JW use data from 10-K filings over the period 1995--2010 extracted from SEC's EDGAR database. They ignore positive and negative words when a negator occurs within a distance of three words, the negators being the words ``not, no, never''. 
+
+- Word weight scores are computed for the entire sample, and also for three roughly equal concatenated subperiods. The correlation of word weights across these subperiods is high, around 0.50 on average. Hence, the word weights appear to be quite stable over time and different economic regimes. As would be expected, when two subperiods are used the correlation of word weights is higher, suggesting that longer samples deliver better weighting scores. Interestingly, the correlation of JW scores with LM $idf$ scores is low, and therefore, they are not substitutes. 
+
+- JW examine the market variables that determine document score $S_i^{JW}$ for each 10-K with right-hand side variables as the size of the firm, book-to-market, volatility, turnover, three day excess return over CRSP VW around earnings announcements, and accruals. Both positive and negative tone are significantly related to size and BM, suggesting that risk factors are captured in score. 
+
+- Volatility is also significant and has the correct sign, i.e., that increases in volatility make negative tone more negative and positive tone less positive. 
+
+- The same holds for turnover, in that more turnover makes tone pessimistic. The greater the earnings announcement abnormal return, the higher the tone, though this is not significant. Accruals do not significantly relate to score.  
+
+- When regressing filing period return on document score and other controls (same as in the previous paragraph), the score is always statistically significant. Hence text in the 10-Ks does correlate with the market's view of the firm after incorporating the information in the 10-K and from other sources. 
+
+- Finally, JW find a negative relation between tone and IPO underpricing, suggesting that term weights from one domain can be reliably used in a different domain.
+
+## Using the MD&A
+
+- When using company filings, it is often an important issue as to whether to use the entire text of the filing or not. Sharper conclusions may be possible from specific sections of the filing such as a 10-K. Loughran and McDonald (2011) examined whether the Management Discussion and Analysis (MD\&A) section of the filing was better at providing tone (sentiment) then the entire 10-K. They found not. 
+
+- They also showed that using their six tailor-made word lists gave better results for detecting tone than did the Harvard Inquirer words. And as discussed earlier, proper word-weighting also improves tone detection. Their word lists also worked well in detecting tone for seasoned equity offerings and news articles, providing good correlation with returns. 
+
+## Readability of Financial Reports
+
+- Loughran and McDonald (2014) examine the readability of financial documents, by surveying at the text in 10-K filings. They compute the Fog index for these documents and compare this to post filing measures of the information environment such as volatility of returns, dispersion of analysts recommendations. When the text is readable, then there should be less dispersion in the information environment, i.e., lower volatility and lower dispersion of analysts expectations around the release of the 10-K. 
+
+- Whereas they find that the Fog index does not seem to correlate well with these measures of the information environment, the file size of the 10-K is a much better measure and is significantly related to return volatility, earnings forecast errors, and earnings forecast dispersion, after accounting for control variates such as size, book-to-market, lagged volatility, lagged return, and industry effects. 
+
+- Li (2008) also shows that 10-Ks with high Fog index and longer length have lower subsequent earnings. Thus managers with poor performance may try to hide this by increasing the complexity of their documents, mostly by increasing the size of their filings. 
+
+- The readability of business documents has caught the attention of many researchers, and not unexpectedly, in the accounting area. DeFranco et al (2013) combine the Fog, Flesh-Kincaid, and Flesch scores to show that higher readability of analyst's reports is related to higher trading volume, suggesting that a better information environment induces people to trade more and not shy away from the market. 
+
+- Lehavy et al (2011) show that a greater Fog index on 10-Ks is correlated with greater analyst following, more analyst dispersion, and lower accuracy of their forecasts. Most of the literature focuses on 10-Ks because these are deemed the most information to investors, but it would be interesting to see if readability is any different when looking at shorter documents such as 10-Qs. Whether the simple, dominant (albeit language independent) measure of file size remains a strong indicator of readability remains to be seen in documents other than 10-Ks. 
+
+- Another examination of 10-K text appears in Bodnaruk et al (2013). Here, the authors measure the percentage of negative words in 10-Ks to see if this is an indicator of financial constraints that improves on existing measures. There is low correlation of this measure with size, where bigger firms are widely posited to be less financially constrained. But, an increase in the percentage of negative words suggests an inflection point indicating the tendency of a firm to lapse into a state of financial constraint. Using control variables such as market capitalization, prior returns, and a negative earnings indicator, percentage negative words helps more in identifying which firm will be financially constrained than widely used constraint indexes. The negative word count is useful in that it is independent of the way in which the filing is written, and picks up cues from managers who tend to use more negative words. 
+
+- The number of negative words is useful in predicting liquidity events such as dividend cuts or omissions, downgrades, and asset growth.  A one standard deviation increase in negative words increases the likelihood of a dividend omission by 8.9\% and a debt downgrade by 10.8\%. An obvious extension of this work would be to see whether default probability models may be enhanced by using the percentage of negative words as an explanatory variable. 
+
+
+
+
+
+## IBM's Midas System
+
+<img src = "Midas_Architecture.png" width=700 height=350>
+<img src = "Midas_FilingMap.png" width=700 height=350>
+<img src = "Midas_Insider_Holdings.png" width=700 height=350>
+<img src = "Midas_Insider_Transactions.png" width=700 height=350>
+<img src = "Midas_LoanNet2005.png" width=500 height=350>
+<img src = "Midas_LoanNet2006-2009.png" width=500 height=350>
+<img src = "Midas_Centrality2005.png" width=500 height=350>
+
+
+
+## Corporate Finance and Risk Management
+
+1. Sprenger (2011) integrates data from text classification of tweets, user voting, and a proprietary stock game to extract the bullishness of online investors; these ideas are behind the site http://TweetTrader.net.
+
+2. Tweets also pose interesting problems of big streaming data discussed in Pervin, Fang, Datta, and Dutta (2013).
+
+3. Data used here is from filings such as 10-Ks, etc., (Loughran and McDonald (2011); Burdick et al (2011); Bodnaruk, Loughran, and McDonald (2013); Jegadeesh and Wu (2013); Loughran and McDonald (2014)).
+
+## Predicting Markets
+
+1. Wysocki (1999) found that for the 50 top firms in message posting volume on Yahoo! Finance, message volume predicted next day abnormal stock returns. Using a broader set of firms, he also found that high message volume firms were those with inflated valuations (relative to fundamentals), high trading volume, high short seller activity (given possibly inflated valuations), high analyst following (message posting appears to be related to news as well, correlated with a general notion of "attention" stocks), and low institutional holdings (hence broader investor discussion and interest), all intuitive outcomes.
+
+2. Bagnoli, Beneish, and Watts (1999) examined earnings "whispers", unofficial crowd-sourced forecasts of quarterly earnings from small investors, are more accurate than that of First Call analyst forecasts.
+
+3. Tumarkin and Whitelaw (2001) examined self-reported sentiment on the Raging Bull message board and found no predictive content, either of returns or volume.
+
+## Bullishness Index
+
+Antweiler and Frank (2004) used the Naive Bayes algorithm for classification, implemented in the {\tt Rainbow} package of Andrew McCallum (1996). They also repeated the same using Support Vector Machines (SVMs) as a robustness check. Both algorithms generate similar empirical results. Once the algorithm is trained, they use it out-of-sample to sign each message as $\{Buy, Hold, Sell\}$. Let $n_B, n_S$ be the number of buy and sell messages, respectively. Then $R = n_B/n_S$ is just the ration of buy to sell messages. Based on this they define their bullishness index
+
+$$
+B = \frac{n_B - n_S}{n_B + n_S} = \frac{R-1}{R+1} \in (-1,+1)
+$$
+
+This metric is independent of the number of messages, i.e., is homogenous of degree zero in $n_B,n_S$. An alternative measure is also proposed, i.e., 
+
+$$
+\begin{eqnarray*}
+B^* &=& \ln\left[\frac{1+n_B}{1+n_S} \right] \\
+&=& \ln\left[\frac{1+R(1+n_B+n_S)}{1+R+n_B+n_S} \right] \\
+&=& \ln\left[\frac{2+(n_B+n_S)(1+B)}{2+(n_B+n_S)(1-B)} \right] \\
+& \approx & B \cdot \ln(1+n_B+n_S)
+\end{eqnarray*}
+$$
+
+This measure takes the bullishness index $B$ and weights it by the number of messages of both categories. This is homogenous of degree between zero and one. And they also propose a third measure, which is much more direct, i.e., 
+
+$$
+B^{**} = n_B - n_S = (n_B+n_S) \cdot \frac{R-1}{R+1} = M \cdot B
+$$
+
+which is homogenous of degree one, and is a message weighted bullishness index. They prefer to use $B^*$ in their algorithms as it appears to deliver the best predictive results. Finally, \cite{AF04} produce an agreement index, 
+
+$$
+A = 1 - \sqrt{1-B^2} \in (0,1)
+$$
+
+Note how closely this is related to the disagreement index seen earlier. 
+
+- The bullishness index does not predict returns, but returns do explain message posting. More messages are posted in periods of negative returns, but this is not a significant relationship. 
+
+- A contemporaneous relation between returns and bullishness is present. Overall, $AF04$ present some important results that are indicative of the results in this literature, confirmed also in subsequent work. 
+
+- First, that message board postings do not predict returns. 
+
+- Second, that disagreement (measured from postings) induces trading.
+
+- Third, message posting does predict volatility at daily frequencies and intraday. 
+
+- Fourth, messages reflect public information rapidly. Overall, they conclude that stock chat is meaningful in content and not just noise. 
+
+
+
+
+## Possibile Applications for Finance Firms
+
+An illustrative list of **applications** for finance firms is as follows:
+
+- Monitoring corporate buzz.
+- Analyzing textual data to detect, analyze, and understand the more profitable customers or products.
+- Targeting new clients.
+- Customer retention, which is a huge issue. Text mining complaints to prioritize customer remedial action makes a huge difference, especially in the insurance business. 
+- Lending activity - automated management of profiling information for lending screening. 
+- Market prediction and trading.
+- Risk management.
+- Automated financial analysts.
+- Financial forensics to prevent rogue employees from inflicting large losses.
+- Fraud detection.
+- Detecting market manipulation.
+- Social network analysis of clients.
+- Measuring institutional risk from systemic risk.
+
+## What is LSA?
+
+Latent Semantic Analysis (LSA) is an approach for reducing the dimension of the Term-Document Matrix (TDM), or the corresponding Document-Term Matrix (DTM), in general used interchangeably, unless a specific one is invoked. Dimension reduction of the TDM offers two benefits:
+
+- The DTM is usually a sparse matrix, and sparseness means that our algorithms have to work harder on missing data, which is clearly wasteful. Some of this sparseness is attenuated by applying LSA to the TDM. 
+
+- The problem of synonymy also exists in the TDM, which usually contains thousands of terms (words). Synonymy arises becauses many words have similar meanings, i.e., redundancy exists in the list of terms. LSA mitigates this redundancy, as we shall see through the ensuing anaysis of LSA. 
+
+- While not precisely the same thing, think of LSA in the text domain as analogous to PCA in the data domain. 
+
+## How is LSA implemented using SVD?
+
+LSA is the application of Singular Value Decomposition (SVD) to the TDM, extracted from a text corpus. Define the TDM to be a matrix $M \in {\cal R}^{m \times n}$, where $m$ is the number of terms and $n$ is the number of documents. 
+
+The SVD of matrix $M$ is given by 
+$$
+M = T \cdot S \cdot D^\top
+$$
+where $T \in {\cal R}^{m \times n}$ and $D \in {\cal R}^{n \times n}$ are orthonormal to each other, and $S \in {\cal R}^{n \times n}$ is the "singluar values" matrix, i.e., a diagonal matrix with singular values on the diagonal. These values denote the relative importance of the terms in the TDM. 
+
+
+
+## Example
+
+Create a temporary directory and add some documents to it. This is a modification of the example in the **lsa** package
+
+```{r}
+system("mkdir D")
+write( c("blue", "red", "green"), file=paste("D", "D1.txt", sep="/"))
+write( c("black", "blue", "red"), file=paste("D", "D2.txt", sep="/"))
+write( c("yellow", "black", "green"), file=paste("D", "D3.txt", sep="/"))
+write( c("yellow", "red", "black"), file=paste("D", "D4.txt", sep="/"))
+```
+
+Create a TDM using the **textmatrix** function.
+
+```{r}
+library(lsa)
+tdm = textmatrix("D",minWordLength=1)
+print(tdm)
+```
+
+Remove the extra directory. 
+```{r}
+system("rm -rf D")
+```
+
+
+## So, what does SVD do? 
+
+SVD tries to connect the correlation matrix of terms ($M \cdot M^\top$) with the correlation matrix of documents ($M^\top \cdot M$) through the singular matrix. 
+
+To see this connection, note that matrix $T$ contains the eigenvectors of the correlation matrix of terms. Likewise, the matrix $D$ contains the eigenvectors of the correlation matrix of documents. To see this, let's compute
+
+```{r}
+et = eigen(tdm %*% t(tdm))$vectors
+print(et)
+ed = eigen(t(tdm) %*% tdm)$vectors
+print(ed)
+```
+
+## Dimension reduction of the TDM via LSA
+
+If we wish to reduce the dimension of the latent semantic space to $k < n$ then we use only the first $k$ eigenvectors. The **lsa** function does this automatically. 
+
+We call LSA and ask it to automatically reduce the dimension of the TDM using a built-in function **dimcalc_share**.
+
+```{r}
+res = lsa(tdm,dims=dimcalc_share())
+print(res)
+```
+
+We can see that the dimension has been reduced from $n=4$ to $n=2$. The output is shown for both the term matrix and the document matrix, both of which have only two columns. Think of these as the two "principal semantic components" of the TDM. 
+
+Compare the output of the LSA to the eigenvectors above to see that it is exactly that. The singular values in the ouput are connected to SVD as follows. 
+
+## LSA and SVD: the connection?
+
+First of all we see that the **lsa** function is nothing but the **svd** function in base R. 
+
+```{r}
+res2 = svd(tdm)
+print(res2)
+```
+
+The output here is the same as that of LSA except it is provided for $n=4$. So we have four columns in $T$ and $D$ rather than two. Compare the results here to the previous two slides to see the connection. 
+
+## What is the rank of the TDM? 
+
+We may reconstruct the TDM using the result of the LSA. 
+
+```{r}
+tdm_lsa = res$tk %*% diag(res$sk) %*% t(res$dk)
+print(tdm_lsa)
+```
+
+We see the new TDM after the LSA operation, it has non-integer frequency counts, but it may be treated in the same way as the original TDM. The document vectors populate a slightly different hyperspace. 
+
+LSA reduces the rank of the correlation matrix of terms $M \cdot M^\top$ to $n=2$. Here we see the rank before and after LSA. 
+
+```{r}
+library(Matrix)
+print(rankMatrix(tdm))
+print(rankMatrix(tdm_lsa))
+```
+
+## And LDA, what does it have to do with LSA?
+
+It is similar to LSA, in that it seeks to find the most related words and cluster them into topics. It uses a Bayesian approach to do this, but more on that later. Here, let's just do an example to see how we might use the **topicmodels** package. 
+
+```{r}
+#Load the package
+library(topicmodels)
+
+#Load data on news articles from Associated Press
+data(AssociatedPress)
+print(dim(AssociatedPress))
+```
+
+This is a large DTM (not TDM). It has more than 10,000 terms, and more than 2,000 documents. This is very large and LDA will take some time, so let's run it on a subset of the documents. 
+
+```{r}
+dtm = AssociatedPress[1:100,]
+dim(dtm)
+```
+
+
+## Now we run LDA on this data set
+
+```{r}
+#Set parameters for Gibbs sampling
+burnin = 4000
+iter = 2000
+thin = 500
+seed = list(2003,5,63,100001,765)
+nstart = 5
+best = TRUE
+
+#Number of topics
+k = 5
+```
+
+```{r, eval=FALSE}
+#Run LDA
+res <-LDA(dtm, k, method="Gibbs", control = list(nstart = nstart, seed = seed, best = best, burnin = burnin, iter = iter, thin = thin))
+
+#Show topics
+res.topics = as.matrix(topics(res))
+print(res.topics)
+
+#Show top terms
+res.terms = as.matrix(terms(res,10))
+print(res.terms)
+
+#Show topic probabilities
+res.topicProbs = as.data.frame(res@gamma)
+print(res.topicProbs)
+
+#Check that each term is allocated to all topics
+print(rowSums(res.topicProbs))
+```
+
+Note that the highest probability in each row assigns each document to a topic. 
+
+## Shallow Dive into LDA
+
+Latent Dirichlet Allocation (LDA) was created by David Blei, Andrew Ng, and Michael Jordan in 2003, see their paper titled "Latent Dirichlet Allocation" in the *Journal of Machine Learning Research*, pp 993--1022.
+
+The simplest way to think about LDA is as a probability model that connects documents with words and topics. The components are:
+
+- A Vocabulary of $V$ words, i.e., $w_1,w_2,...,w_i,...,w_V$, each word indexed by $i$. 
+- A Document is a vector of $N$ words, i.e., ${\bf w}$. 
+- A Corpus $D$ is a collection of $M$ documents, each document indexed by $j$, i.e. $d_j$. 
+
+Next, we connect the above objects to $K$ topics, indexed by $l$, i.e., $t_l$.  We will see that LDA is encapsulated in two matrices: Matrix $A$ and Matrix $B$.  
+
+## Matrix $A$: Connecting Documents with Topics
+
+- This matrix has documents on the rows, so there are $M$ rows. 
+- The topics are on the columns, so there are $K$ columns. 
+- Therefore $A \in {\cal R}^{M \times K}$. 
+- The row sums equal $1$, i.e., for each document, we have a probability that it pertains to a given topic, i.e., $A_{jl} = Pr[t_l | d_j]$, and $\sum_{l=1}^K A_{jl} = 1$. 
+
+## Matrix $B$: Connecting Words with Topics
+
+- This matrix has topics on the rows, so there are $K$ rows. 
+- The words are on the columns, so there are $V$ columns. 
+- Therefore $B \in {\cal R}^{K \times V}$. 
+- The row sums equal $1$, i.e., for each topic, we have a probability that it pertains to a given word, i.e., $B_{li} = Pr[w_i | t_l]$, and $\sum_{i=1}^V B_{li} = 1$. 
+
+## Distribution of Topics in a Document
+
+- Using Matrix $A$, we can sample a $K$-vector of probabilities of topics for a single document. Denote the probability of this vector as $p(\theta | \alpha)$, where $\theta, \alpha \in {\cal R}^K$, $\theta, \alpha \geq 0$, and $\sum_l \theta_l = 1$.  
+- The probability $p(\theta | \alpha)$ is governed by a Dirichlet distribution, with density function
+
+$$
+p(\theta | \alpha) = \frac{\Gamma(\sum_{l=1}^K \alpha_l)}{\prod_{l=1}^K \Gamma(\alpha_l)} \; \prod_{l=1}^K \theta_l^{\alpha_l - 1}
+$$
+
+where $\Gamma(\cdot)$ is the Gamma function. 
+- LDA thus gets its name from the use of the Dirichlet distribution, embodied in Matrix $A$. Since the topics are latent, it explains the rest of the nomenclature. 
+- Given $\theta$, we sample topics from matrix $A$ with probability $p(t | \theta)$.
+
+
+## Distribution of Words and Topics for a Document
+
+- The number of words in a document is assumed to be distributed Poisson with parameter $\xi$. 
+- Matrix $B$ gives the probability of a word appearing in a topic, $p(w | t)$. 
+- The topics mixture is given by $\theta$. 
+- The joint distribution over $K$ topics and $K$ words for a topic mixture is given by
+
+$$
+p(\theta, {\bf t}, {\bf w}) = p(\theta | \alpha) \prod_{l=1}^K p(t_l | \theta) p(w_l | t_l)
+$$
+
+- The marginal distribution for a document's words comes from integrating out the topic mixture $\theta$, and summing out the topics ${\bf t}$, i.e., 
+
+$$
+p({\bf w}) = \int p(\theta | \alpha) \left(\prod_{l=1}^K \sum_{t_l} p(t_l | \theta) p(w_l | t_l)\; \right) d\theta
+$$
+
+## Likelihood of the entire Corpus
+
+- This is given by:
+
+$$
+p(D) = \prod_{j=1}^M \int p(\theta_j | \alpha) \left(\prod_{l=1}^K \sum_{t_{jl}} p(t_l | \theta_j) p(w_l | t_l)\; \right) d\theta_j
+$$
+
+- The goal is to maximize this likelihood by picking the vector $\alpha$ and the probabilities in the matrix $B$. (Note that were a Dirichlet distribution not used, then we could directly pick values in Matrices $A$ and $B$.)
+
+- The computation is undertaken using MCMC with Gibbs sampling as shown in the example earlier. 
+
+## Examples in Finance
+
+<img src = "topycs1.png" width=700 height=350>
+
+<img src = "topycs2.png" width=700 height=350>
+
+
+## Using the *rvest* package: Overview
+
+The **rvest** package, written bu Hadley Wickham, is a powerful tool for extracting text from web pages. The package provides wrappers around the 'xml2' and 'httr' packages to make it easy to download, and then manipulate, HTML and XML. The package is best illustrated with some simple examples. 
+
+## Program to read a web page using the selector gadget
+
+Here is some code to read in the slashdot web page and gather the stories currently on their headlines. 
+
+```{r}
+library(rvest)
+url = "https://slashdot.org/"
+
+doc.html = read_html(url)
+text = doc.html %>% html_nodes(".story") %>% html_text()
+
+text = gsub("[\t\n]","",text)
+#text = paste(text, collapse=" ")
+print(text[1:20])
+```
+
+## Program to read a web table using the selector gadget
+
+Sometimes we need to read a table embedded in a web page and this is also a simple exercise, which is undertaken also with **rvest**. 
+
+```{r}
+library(rvest)
+url = "http://finance.yahoo.com/q?uhb=uhb2&fr=uh3_finance_vert_gs&type=2button&s=IBM"
+
+doc.html = read_html(url)
+table = doc.html %>% html_nodes("table") %>% html_table()
+
+print(table)
+```
+
+Note that this code extracted all the web tables in the Yahoo! Finance page and returned each one as a list item. 
+
+## Program to read a web table into a data frame
+
+Here we take note of some Russian language sites where we want to extract forex quotes and store them in a data frame. 
+
+```{r}
+library(rvest)
+
+url1 <- "http://finance.i.ua/market/kiev/?type=1"  #Buy USD
+url2 <- "http://finance.i.ua/market/kiev/?type=2"  #Sell USD
+
+doc1.html = read_html(url1)
+table1 = doc1.html %>% html_nodes("table") %>% html_table()
+result1 = table1[[1]]
+print(head(result1))
+
+doc2.html = read_html(url2)
+table2 = doc2.html %>% html_nodes("table") %>% html_table()
+result2 = table2[[1]]
+print(head(result2))
+```
+
+
+## Using the *rselenium* package
+
+```{r, eval=FALSE}
+#Clicking Show More button Google Scholar page
+
+library(RCurl)
+library(RSelenium)
+library(rvest)
+library(stringr)
+library(igraph)
+checkForServer()
+startServer()
+remDr <- remoteDriver(remoteServerAddr = "localhost" 
+                      , port = 4444
+                      , browserName = "firefox"
+)
+remDr$open()
+remDr$getStatus()
+```
+
+## Application to Google Scholar data
+
+```{r, eval=FALSE}
+remDr$navigate("http://scholar.google.com")
+webElem <- remDr$findElement(using = 'css selector', "input#gs_hp_tsi")
+webElem$sendKeysToElement(list("Sanjiv Das", "\uE007"))
+link <- webElem$getCurrentUrl()
+page <- read_html(as.character(link))
+citations <- page %>% html_nodes (".gs_rt2")
+matched <- str_match_all(citations, "<a href=\"(.*?)\"")
+scholarurl <- paste("https://scholar.google.com", matched[[1]][,2], sep="")
+page <- read_html(as.character(scholarurl))
+remDr$navigate(as.character(scholarurl))
+authorlist <- page %>% html_nodes(css=".gs_gray") %>% html_text() # Selecting fields after CSS selector .gs_gray
+authorlist <- as.data.frame(authorlist)
+odd_index <- seq(1,nrow(authorlist),2) #Sorting data by even/odd indexes to form a table.
+even_index <- seq (2,nrow(authorlist),2)
+authornames <- data.frame(x=authorlist[odd_index,1])
+papernames <- data.frame(x=authorlist[even_index,1])
+pubmatrix <- cbind(authorlist,papernames)
+
+# Building the view all link on scholar page.
+a=str_split(matched, "user=")
+x <- substring(a[[1]][2], 1,12)
+y<- paste("https://scholar.google.com/citations?view_op=list_colleagues&hl=en&user=", x, sep="")
+remDr$navigate(y)
+
+#Reading view all page to get author list:
+page <- read_html(as.character(y))
+z <- page %>% html_nodes (".gsc_1usr_name")
+
+x <-lapply(z,str_extract,">[A-Z]+[a-z]+ .+<")
+x<-lapply(x,str_replace, ">","")
+x<-lapply(x,str_replace, "<","")
+
+# Graph function:
+bsk <- as.matrix(cbind("SR Das", unlist(x)))
+bsk.network<-graph.data.frame(bsk, directed=F)
+plot(bsk.network)
+```
+
+
+## word2vec
+
+<img src = "Work_in_Progress.png" width=600 height=350>
+
+
+## End Note!
+
+<img src = "Dilbert_UnstructuredText.png" width=800 height=350>
+
+Biblio at: 
+http://algo.scu.edu/~sanjivdas/Das_TextAnalyticsInFinance.pdf
