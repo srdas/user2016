@@ -9,13 +9,11 @@ output: slidy_presentation
 ## Reference monograph
 
 Text expands the universe of data by many-fold. See my monograph on text mining in finance at:
-http://algo.scu.edu/~sanjivdas/Das_TextAnalyticsInFinance.pdf
+http://srdas.github.io/Das_TextAnalyticsInFinance.pdf
 
 This covers some of the content of this presentation. These files are useful for the talk itself and you may run the program code as we proceed. 
 
-http://algo.scu.edu/~sanjivdas/Temp/user2016/
-
-
+http://srdas.github.io/Temp/user2016/
 
 
 
@@ -59,7 +57,7 @@ https://www.amazon.com/Handbook-News-Analytics-Finance/dp/047066679X/ref=sr_1_1?
 The R programming language is increasingly being used to download text from the web and then analyze it. The ease with which R may be used to scrape text from web site may be seen from the following simple command in R:
 
 ```{r}
-text = readLines("http://algo.scu.edu/~sanjivdas/bio-candid.html")
+text = readLines("http://srdas.github.io/bio-candid.html")
 text[15:20]
 ```
 
@@ -193,7 +191,7 @@ cat(saveXML(xml))
 First, let's read in a simple web page (my landing page)
 
 ```{r}
-text = readLines("http://algo.scu.edu/~sanjivdas/")
+text = readLines("http://srdas.github.io/")
 print(text[1:4])
 print(length(text))
 ```
@@ -227,7 +225,7 @@ Now we look at using regular expressions with the **grep** command to clean out 
 
 ```{r}
 #SIMPLE TEXT HANDLING
-text = readLines("http://algo.scu.edu/~sanjivdas/research.htm")
+text = readLines("http://srdas.github.io/research.htm")
 print(length(text))
 print(text)
 
@@ -340,7 +338,7 @@ print(txt)
 Now we will do a full pass through of this on my bio.
 
 ```{r}
-text = readLines("http://algo.scu.edu/~sanjivdas/bio-candid.html")
+text = readLines("http://srdas.github.io/bio-candid.html")
 ctext = Corpus(VectorSource(text))
 ctext
 
@@ -460,6 +458,39 @@ print(as.matrix(m))
 print(as.matrix(weightTfIdf(m)))
 ```
 
+## Using the ANLP package for bigrams and trigrams
+
+This package has a few additional functions that make the preceding ideas more streamlined to implement. First let's read in the usual text. 
+
+```{r}
+library(ANLP)
+download.file("http://srdas.github.io/bio-candid.html",destfile = "text")
+text = readTextFile("text","UTF-8")
+ctext = cleanTextData(text)  #Creates a text corpus
+```
+
+The last function removes non-english characters, numbers, white spaces, brackets, punctuation. It also handles cases like abbreviation, contraction. It converts entire text to lower case.
+
+We now make TDMs for unigrams, bigrams, trigrams. Then, combine them all into one list for word prediction. 
+
+```{r}
+g1 = generateTDM(ctext,1)
+g2 = generateTDM(ctext,2)
+g3 = generateTDM(ctext,3)
+gmodel = list(g1,g2,g3)
+```
+
+Next, use the **back-off** algorithm to predict the next sequence of words. 
+
+```{r}
+print(predict_Backoff("you never",gmodel))
+print(predict_Backoff("life is",gmodel))
+print(predict_Backoff("been known",gmodel))
+print(predict_Backoff("needs to",gmodel))
+print(predict_Backoff("worked at",gmodel))
+print(predict_Backoff("being an",gmodel))
+print(predict_Backoff("publish",gmodel))
+```
 
 
 ## Wordclouds
@@ -575,8 +606,8 @@ library(RCurl)
 download.file(url="https://curl.haxx.se/ca/cacert.pem",destfile="cacert.pem")
 #certificate file based on Privacy Enhanced Mail (PEM) protocol: https://en.wikipedia.org/wiki/Privacy-enhanced_Electronic_Mail
 
-cKey = "h4J3x0i5qwskgD58E1t5JCEnw"  #These are my keys and won't work for you
-cSecret = "fi4SOHENdsweNySeQKWe95SuBIRx74Xjv0Cx4EZx59QKwg"   #use your own secret
+cKey = "h4J3x0i5kgD58E1t5JCEnw"  #These are my keys and won't work for you
+cSecret = "fi4SOHENNySeQKWe95SuBIRx74Xjv0Cx4EZx59QKwg"   #use your own secret
 reqURL = "https://api.twitter.com/oauth/request_token"
 accURL = "https://api.twitter.com/oauth/access_token"
 authURL = "https://api.twitter.com/oauth/authorize"
@@ -598,8 +629,8 @@ cred$handshake(cainfo="cacert.pem") #Asks for token
 ##USE httr, SECOND PHASE
 library(httr)
 #options(httr_oauth_cache=T)
-accToken = "18666236-DmawqsDE1wwbpvPbDcw9kwt9yThGeyYhjfpVVywrHuhOQ"
-accTokenSecret = "cttbpxpTtfrwqasqJn7wrCP36I59omNI5GQHXXgV41sKwUgc"
+accToken = "18666236-DmDE1wwbpvPbDcw9kwt9yThGeyYhjfpVVywrHuhOQ"
+accTokenSecret = "cttbpxpTtqJn7wrCP36I59omNI5GQHXXgV41sKwUgc"
 setup_twitter_oauth(cKey,cSecret,accToken,accTokenSecret)  #At prompt type 1
 ```
 
@@ -644,7 +675,7 @@ library(streamR)
 filterStream(file.name = "tweets.json", # Save tweets in a json file
              track = "useR_Stanford" , # Collect tweets with useR_Stanford over 60 seconds. Can use twitter handles or keywords.
              language = "en",
-             timeout = 60, # Keep connection alive for 60 seconds
+             timeout = 30, # Keep connection alive for 60 seconds
              oauth = cred) # Use OAuth credentials
 
 tweets.df <- parseTweets("tweets.json", simplify = FALSE) # parse the json file and save to a data frame called tweets.df. Simplify = FALSE ensures that we include lat/lon information in that data frame.
@@ -657,7 +688,7 @@ tweets.df <- parseTweets("tweets.json", simplify = FALSE) # parse the json file 
 filterStream(file.name = "tweets.json", # Save tweets in a json file
              track = "3497513953" , # Collect tweets from useR2016 feed over 60 seconds. Must use twitter ID of the user.
              language = "en",
-             timeout = 60, # Keep connection alive for 60 seconds
+             timeout = 30, # Keep connection alive for 60 seconds
              oauth = cred) # Use my_oauth file as the OAuth credentials
 tweets.df <- parseTweets("tweets.json", simplify = FALSE)
 ```
@@ -681,8 +712,8 @@ library(Rfacebook)
 library(SnowballC)
 library(Rook)
 library(ROAuth)
-app_id = "847732371920076"   # USE YOUR OWN IDs
-app_secret = "a12wsa0a2ec908d9e00fcd3c619cad7d043"
+app_id = "847737771920076"   # USE YOUR OWN IDs
+app_secret = "a120a2ec908d9e00fcd3c619cad7d043"
 fb_oauth = fbOAuth(app_id,app_secret,extended_permissions=TRUE)
 #save(fb_oauth,file="fb_oauth")
 
@@ -715,10 +746,10 @@ First we examine the protocol for connecting to the Yelp API. This assumes you h
 
 ```{r, eval=FALSE}
 ###CODE to connect to YELP.
-consumerKey = "z6w-Or6awsHSyKbdUTmV9lbOA"
-consumerSecret = "ImUufP3yU9qwasFmNWWx54NUbNEBcj8"
-token = "mBzEBjhYIGgJZnmtTHwasLVdQ-0cyfFVRGu"
-token_secret = "v0FGCL0TS_dFDWawsdFwH3HptDZhiLE"
+consumerKey = "z6w-Or6HSyKbdUTmV9lbOA"
+consumerSecret = "ImUufP3yU9FmNWWx54NUbNEBcj8"
+token = "mBzEBjhYIGgJZnmtTHLVdQ-0cyfFVRGu"
+token_secret = "v0FGCL0TS_dFDWFwH3HptDZhiLE"
 ```
 
 ## Yelp - handshaking with the API
@@ -918,7 +949,7 @@ read_web_page = function(url,cstem=0,cstop=0,ccase=0,cpunc=0,cflat=0) {
 Now apply this function and see how we can get some clean text.
 
 ```{r}
-url = "http://algo.scu.edu/~sanjivdas/research.htm"
+url = "http://srdas.github.io/research.htm"
 res = read_web_page(url,0,0,0,1,1)
 print(res)
 ```
@@ -930,7 +961,7 @@ Now we will take a different page of text and mood score it.
 ```{r}
 #EXAMPLE OF MOOD SCORING
 library(stringr)
-url = "http://algo.scu.edu/~sanjivdas/bio-candid.html"
+url = "http://srdas.github.io/bio-candid.html"
 text = read_web_page(url,cstem=0,cstop=0,ccase=0,cpunc=1,cflat=1)
 print(text)
 
@@ -975,7 +1006,7 @@ And of course, once the language is detected, we may translate it into English.
 
 ```{r}
 library(translate)
-set.key("AIzaSyDIB8qQTmhLlbPNN38Gs4dXnlNqaws4a7lRrHQ")
+set.key("AIzaSyDIB8qQTmhLlbPNN38Gs4dXnlN4a7lRrHQ")
 print(translate(text[1],"fr","en"))
 print(translate(text[3],"it","en"))
 print(translate(text[4],"de","en"))
@@ -1430,7 +1461,7 @@ First, let's grab some text from my web site.
 
 ```{r}
 library(rvest)
-url = "http://algo.scu.edu/~sanjivdas/bio-candid.html"
+url = "http://srdas.github.io/bio-candid.html"
 
 doc.html = read_html(url)
 text = doc.html %>% html_nodes("p") %>% html_text()
@@ -1953,7 +1984,7 @@ best = TRUE
 k = 5
 ```
 
-```{r, eval=FALSE}
+```{r}
 #Run LDA
 res <-LDA(dtm, k, method="Gibbs", control = list(nstart = nstart, seed = seed, best = best, burnin = burnin, iter = iter, thin = thin))
 
@@ -2173,6 +2204,8 @@ plot(bsk.network)
 
 ## word2vec
 
+See package **text2vec**
+
 <img src = "Work_in_Progress.png" width=600 height=350>
 
 
@@ -2181,4 +2214,4 @@ plot(bsk.network)
 <img src = "Dilbert_UnstructuredText.png" width=800 height=350>
 
 Biblio at: 
-http://algo.scu.edu/~sanjivdas/Das_TextAnalyticsInFinance.pdf
+http://srdas.github.io/Das_TextAnalyticsInFinance.pdf
